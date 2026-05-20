@@ -4,7 +4,7 @@
 
 A small, fast, browser-accessible status page and resource monitor for Linux. Clearly inspired by [btop](https://github.com/aristocratos/btop), but built to live on a small case-mounted screen or get pulled up in a tab whenever you want to see how your box is doing.
 
-![monomi dashboard](docs/screenshot.png)
+![monomi-dashboard](https://files.catbox.moe/o62kam.png)
 
 ## What it is
 
