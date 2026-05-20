@@ -6,6 +6,8 @@ A small, fast, browser-accessible status page and resource monitor for Linux. Cl
 
 ![monomi-dashboard](https://files.catbox.moe/o62kam.png)
 
+The style automatically resizes for slim portrait monitors or PC cases (not pictured here yet).
+
 ## What it is
 
 You run a tiny Python collector on the machine you want to watch. Every second it bundles CPU, memory, swap, disk, network, processes, services, and a handful of static system facts into a JSON snapshot and POSTs it to a Cloudflare Worker. The Worker keeps the latest snapshot plus a 6-minute rolling history in a single Durable Object and serves a self-contained HTML/CSS/JS page that reads from it. Your browser polls once a second and repaints.
