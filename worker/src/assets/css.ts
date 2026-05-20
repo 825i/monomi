@@ -1,0 +1,644 @@
+// Page stylesheet. Palette + structure match btop's default theme so the
+// page looks like the terminal app it's mimicking.
+export const STYLE_CSS = String.raw`
+:root {
+  /* core (btop Default_theme) */
+  --bg:         #000000;   /* main_bg */
+  --txt:        #cccccc;   /* main_fg */
+  --txt-dim:    #606060;   /* graph_text */
+  --txt-dimmer: #404040;   /* inactive_fg + meter_bg */
+  --hi:         #eeeeee;   /* title */
+  --accent:     #b54040;   /* hi_fg — red used for menu shortcut chars */
+  --divider:    #303030;   /* div_line */
+
+  /* per-panel box / header colours (Default_theme.*_box) */
+  --box-cpu:   #556d59;
+  --box-mem:   #6c6c4b;
+  --box-disks: #6c6c4b;     /* btop reuses mem_box for the disk side */
+  --box-net:   #5c588d;
+  --box-proc:  #805252;
+
+  /* graph gradients (start/mid/end). We mostly use the *_mid values
+     because the gradient is rendered linearly across the chart anyway. */
+  --cpu-start: #77ca9b;     /* cpu_start (cool) */
+  --cpu-mid:   #cbc06c;     /* cpu_mid */
+  --cpu-end:   #dc4c4c;     /* cpu_end (hot) */
+
+  --free-mid:    #b5e685;
+  --used-mid:    #d9626d;
+  --used-end:    #ff4769;
+  --available-mid: #ffd77a;
+  --cached-mid:  #74e6fc;
+
+  /* good / warn / bad for fill bars */
+  --good:  #b5e685;
+  --warn:  #ffd77a;
+  --bad:   #ff4769;
+
+  /* network gradients per interface */
+  --eth-down: #4f43a3;      /* download_mid (indigo) */
+  --eth-up:   #dcafde;      /* upload_end   (lavender pink) */
+  --wg-down:  #74e6fc;      /* cached_mid (cyan)  — second iface */
+  --wg-up:    #ff40b6;      /* temp_end (pink)    — second iface */
+
+  --proc-alt: #0a0a0a;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--txt);
+  font-family: "IBM Plex Mono", "JetBrains Mono", ui-monospace, Menlo, Consolas, monospace;
+  font-size: 13px;
+  line-height: 1.2;
+  min-height: 100vh;
+  font-variant-numeric: tabular-nums;
+  font-feature-settings: "tnum";
+}
+
+/* 10px top + 5px bottom keeps the panel borders and tab headers off
+   the very edge of the browser viewport. The extra height up top
+   gives the notched panel name chips room to breathe. Sides keep
+   the original 6px. */
+body { padding: 10px 6px 5px; }
+
+/* ───────────────────────────  GRID  ─────────────────────────── */
+
+.screen {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(0, 2.4fr);
+  grid-template-rows: auto auto 1fr;
+  grid-template-areas:
+    "cpu  cpu   cpu"
+    "mem  disks proc"
+    "net  net   proc";
+  gap: 6px;
+  min-height: calc(100vh - 15px);
+  /* keep the dashboard in the middle of wide displays — roughly half the
+     viewport on a 4K, but clamp so it stays readable on smaller screens
+     and never overflows. */
+  width: clamp(900px, 55vw, 1400px);
+  max-width: 100%;
+  margin: 0 auto;
+}
+.cpu   { grid-area: cpu;   }
+.mem   { grid-area: mem;   }
+.disks { grid-area: disks; }
+.net   { grid-area: net;   }
+.proc  { grid-area: proc;  }
+
+@media (max-width: 980px) {
+  .screen {
+    grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+    grid-template-areas:
+      "cpu   cpu"
+      "mem   disks"
+      "net   net"
+      "proc  proc";
+  }
+}
+
+/* ───────────────────────────  PANEL  ─────────────────────────── */
+
+.panel {
+  position: relative;
+  border: 1px solid var(--panel-border, var(--txt-dimmer));
+  padding: 8px 8px 6px;
+  background: var(--bg);
+  min-width: 0;
+}
+
+/* per-panel border + tab colour. The panel name and brackets pick this
+   up via currentColor on .panel-head. */
+.panel.cpu   { --panel-border: var(--box-cpu);   }
+.panel.mem   { --panel-border: var(--box-mem);   }
+.panel.disks { --panel-border: var(--box-disks); }
+.panel.net   { --panel-border: var(--box-net);   }
+.panel.proc  { --panel-border: var(--box-proc);  }
+
+/* header notched onto the top border, btop tab style */
+.panel-head {
+  position: absolute;
+  top: -0.72em;
+  left: 6px;
+  right: 6px;
+  display: flex;
+  align-items: center;
+  gap: 0;
+  white-space: nowrap;
+  font-size: 13px;
+  line-height: 1;
+  pointer-events: none;
+  user-select: none;
+  /* tab num + name + brackets are tinted with the panel's box colour */
+  color: var(--panel-border);
+}
+/* default: every direct child gets the bg-paint so it sits cleanly on the
+   border. Spacing is set per-element below. */
+.panel-head > * { background: var(--bg); }
+/* keep the "1┤cpu├" tab tight, like btop — no padding inside the bracket */
+.panel-head .num {
+  color: var(--hi);                /* tab number in title white */
+  padding: 0 2px 0 0;
+  font-weight: 700;
+}
+.panel-head .bk   { color: var(--panel-border); padding: 0; }
+.panel-head .name {
+  color: var(--panel-border);
+  padding: 0 1px;
+  font-weight: 500;
+}
+/* dividers + menu chips need horizontal breathing room so they don't run
+   into each other. ┬ stays flush to the line above (background blanks the
+   border underneath) but spans get padded. */
+.panel-head .sep   { color: var(--panel-border); background: transparent; padding: 0 4px; }
+.panel-head .menu  { color: var(--txt); padding: 0 4px; position: relative; }
+.panel-head .menu .iface { color: var(--accent); }
+.panel-head .menu .hot   { color: var(--accent); font-weight: 700; }
+
+/* public IP — privacy-hidden until hovered. The blur clears in a quick
+   fade so the value is readable when wanted but doesn't show up in
+   screenshots/over-shoulder by default. The parent .panel-head sets
+   pointer-events:none so the tab strip doesn't intercept clicks, so
+   we have to opt the IP back in to receive :hover + selection. */
+.public-ip {
+  filter: blur(4px);
+  transition: filter 0.15s ease-out;
+  cursor: help;
+  pointer-events: auto;
+  user-select: text;
+}
+.public-ip:hover { filter: blur(0); }
+.panel-head .fill {
+  flex: 1 1 auto;
+  align-self: stretch;
+  height: 1px;
+  margin-top: 0.5em;
+  background: var(--panel-border);
+  padding: 0;
+}
+.panel-head .clock     { color: var(--hi); padding: 0 6px; }
+.panel-head .rate-ctrl { color: var(--hi); padding: 0 6px 0 0; }
+.panel-head .rate-dim  { color: var(--panel-border); }
+
+/* ───────────────────────────  CPU panel  ───────────────────── */
+
+.cpu-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 8px 14px;
+  align-items: stretch;
+}
+.cpu-graphs {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  min-width: 0;
+  justify-content: center;
+}
+.g {
+  font-family: inherit;
+  margin: 0;
+  white-space: pre;
+  overflow: hidden;
+}
+.cpu-graph {
+  color: var(--cpu-mid);
+  font-size: 14px;
+  line-height: 1;
+  /* 14 braille rows × 14px = 196px — plenty of headroom so we can show
+     small CPU values clearly without saturating big ones. */
+  min-height: 196px;
+}
+
+/* per-core mini chart on the right of the cpu panel. Each row is
+   "C# <bar> <pct>" laid out as a 3-col grid so values line up. */
+.cpu-stats {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 4px;
+  min-width: 240px;
+}
+.per-core {
+  display: grid;
+  grid-template-columns: 2.4em minmax(0, 1fr) 3.6em;
+  gap: 4px 6px;
+  align-items: baseline;
+  width: 100%;
+  font-size: 12px;
+}
+.per-core .core-lbl { color: var(--txt-dim); }
+.per-core .core-spk {
+  font-size: 14px;
+  line-height: 1;
+  color: var(--cpu-mid);
+  white-space: pre;
+  overflow: hidden;
+  /* zero out the browser's default <pre> margin so the 4 spark rows
+     stack compactly instead of each adding ~1em of vertical space. */
+  margin: 0;
+}
+.per-core .core-pct { color: var(--cpu-mid); text-align: right; }
+
+.cpu-table { border-collapse: collapse; }
+.cpu-table th, .cpu-table td { padding: 0 8px 0 0; text-align: left; font-weight: 400; }
+.cpu-table th { color: var(--txt-dim); }
+.cpu-table .v { color: var(--cpu-mid); text-align: right; min-width: 3.5em; }
+.cpu-table .t { color: var(--available-mid); text-align: right; min-width: 4em; }
+.cpu-table .f { color: var(--hi); text-align: right; min-width: 5em; padding-right: 0; }
+.cpu-table tr.load th { color: var(--txt-dim); padding-right: 6px; }
+.cpu-table tr.load .v { color: var(--txt); min-width: 3em; }
+.uptime { margin-top: 6px; color: var(--txt-dim); font-size: 12px; }
+
+/* ───────────────────────────  MEM panel  ───────────────────── */
+
+/* mem panel is a flex column so the history sparkline at the bottom
+   can flex-grow to fill whatever vertical slack the panel has versus
+   disks (which is usually taller because of its swap section). */
+.panel.mem { display: flex; flex-direction: column; }
+.mem-body { display: flex; flex-direction: column; gap: 6px; flex-shrink: 0; }
+
+/* memory history graph at the bottom of the mem panel. Same shape as
+   the disks i/o block (paired with the same red outline so the two
+   sub-sections read as siblings). Auto-grows to fill the gap. */
+.memhist-block {
+  /* margin-top: 22 puts the "history" label on the same horizontal
+     line as "Free:" in the disks panel's swap section. */
+  margin-top: 22px;
+  display: flex;
+  flex-direction: column;
+  /* matches the Free swap section's height (label row + pct + bucket
+     = ~73px) so memhist bottom aligns with the Free bucket bottom. */
+  height: 73px;
+  outline: 1px solid var(--box-proc);   /* dustier red than --accent */
+  outline-offset: 4px;                  /* gap between text + outline */
+}
+.memhist-block .iface-label {
+  color: var(--txt-dim);
+  font-size: 11px;
+  margin-bottom: 2px;
+}
+.memhist-block .iface-label .name { color: var(--accent); font-weight: 700; }
+.memhist-graph {
+  flex: 1 1 auto;
+  font-size: 14px;
+  line-height: 1;
+  min-height: 56px;
+}
+.mem-row {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  color: var(--txt);
+}
+.mem-row-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  gap: 6px;
+}
+.mem-row .lbl { color: var(--txt-dim); }
+.mem-row .val { color: var(--hi); text-align: right; white-space: nowrap; }
+.mem-row-pct {
+  color: var(--txt-dim);
+  font-size: 11px;
+  line-height: 1;
+}
+/* the bucket itself — fixed-height multi-row braille fill that drains
+   from the top as the percentage shrinks. */
+.mem-row .bucket {
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1;
+  margin: 0;
+  white-space: pre;
+  overflow: hidden;
+  letter-spacing: 0;
+}
+/* per-metric colours pulled from btop's default palette gradients. */
+.mem-row.used       .bucket { color: var(--used-mid); }
+.mem-row.available  .bucket { color: var(--available-mid); }
+.mem-row.cached     .bucket { color: var(--cached-mid); }
+.mem-row.free       .bucket { color: var(--free-mid); }
+.mem-row.swap-used  .bucket { color: var(--used-mid); }
+.mem-row.swap-free  .bucket { color: var(--free-mid); }
+
+.mem-section {
+  border-top: 1px dotted var(--divider);
+  margin-top: 4px;
+  padding-top: 4px;
+  color: var(--box-mem);
+}
+
+/* ─── horizontal braille fill bar (mem + disks) ─── */
+.hbar {
+  font-family: inherit;
+  font-size: 14px;
+  line-height: 1;
+  letter-spacing: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  color: var(--good);
+}
+.hbar.bar-good { color: var(--good); }
+.hbar.bar-warn { color: var(--warn); }
+.hbar.bar-bad  { color: var(--bad);  }
+
+/* ───────────────────────────  DISKS panel  ─────────────────── */
+
+.disks-body { display: flex; flex-direction: column; gap: 10px; }
+.swap-body  { display: flex; flex-direction: column; gap: 6px; margin-top: 6px; }
+
+/* disk I/O sparkline: same braille graph shape as the net graphs but
+   coloured per direction (cyan for read, amber for write). The red
+   outline (paired with the mem history block) groups these two as
+   "same kind, sibling panels' sub-sections" without changing layout. */
+.diskio-block {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+  outline: 1px solid var(--box-proc);   /* dustier red than --accent */
+  outline-offset: 4px;                  /* gap between text + outline */
+}
+.diskio-block .iface-label {
+  color: var(--txt-dim);
+  font-size: 11px;
+  margin-bottom: 2px;
+}
+.diskio-block .iface-label .name { color: var(--accent); font-weight: 700; }
+.diskio-graph {
+  font-size: 14px;
+  line-height: 1;
+  min-height: 60px;
+}
+.diskio-graph .read-half  { color: var(--cached-mid); }
+.diskio-graph .write-half { color: var(--available-mid); }
+.disk-row {
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  font-size: 13px;
+}
+.disk-name {
+  color: var(--hi);
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+}
+.disk-total { color: var(--txt-dim); font-size: 0.95em; }
+.disk-stats {
+  display: grid;
+  /* keep the row inside the panel even when the panel gets narrow —
+     the 1fr bar can collapse to almost zero, label + value stay tight. */
+  grid-template-columns: 3.5em minmax(0, 1fr) 7em;
+  gap: 6px;
+  align-items: baseline;
+  color: var(--txt);
+}
+.disk-stats .lbl { color: var(--txt-dim); }
+.disk-stats .val {
+  color: var(--hi);
+  text-align: right;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ───────────────────────────  NET panel  ───────────────────── */
+
+.net-body {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 16em;
+  grid-template-rows: 1fr 1fr;
+  gap: 4px 12px;
+  min-height: 220px;
+  align-items: stretch;
+}
+/* graph blocks: one per interface. .net-info sits in column 2 spanning
+   both rows. */
+.net-graph-block {
+  grid-column: 1;
+  min-height: 92px;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
+}
+.net-graph-block .iface-label {
+  color: var(--txt-dim);
+  font-size: 11px;
+  margin-bottom: 2px;
+}
+.net-graph-block .iface-label .name { color: var(--accent); font-weight: 700; }
+.net-graph-block .iface-label .ip-sep { color: var(--txt-dimmer); padding: 0 2px; }
+.net-graph {
+  flex: 1 1 auto;
+  font-size: 14px;
+  line-height: 1;
+}
+.net-graph.eth0 .net-down-half { color: var(--eth-down); }
+.net-graph.eth0 .net-up-half   { color: var(--eth-up);   }
+.net-graph.wg0  .net-down-half { color: var(--wg-down);  }
+.net-graph.wg0  .net-up-half   { color: var(--wg-up);    }
+
+.net-info {
+  grid-column: 2;
+  grid-row: 1 / span 2;
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  justify-content: center;
+  align-self: stretch;
+  font-size: 13px;
+  border: 1px solid var(--box-net);
+  padding: 6px 10px;
+  background: var(--bg);
+}
+.net-block { display: flex; flex-direction: column; gap: 2px; }
+.net-block + .net-block { margin-top: 4px; padding-top: 4px; border-top: 1px dotted var(--divider); }
+.net-title { color: var(--txt); margin-top: 2px; }
+.net-row {
+  display: grid;
+  grid-template-columns: 1.4em 1fr auto;
+  gap: 4px;
+  align-items: baseline;
+}
+.net-row .ar.dn { color: var(--eth-down); }
+.net-row .ar.up { color: var(--eth-up); }
+.net-row.wg .ar.dn { color: var(--wg-down); }
+.net-row.wg .ar.up { color: var(--wg-up); }
+.net-row .lbl   { color: var(--txt-dim); }
+.net-row .now   { color: var(--hi); text-align: right; }
+.net-row .num2  { color: var(--hi); text-align: right; }
+
+@media (max-width: 980px) {
+  .net-body  { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; }
+  .net-graph-block, .net-info { grid-column: 1; }
+  .net-info  { grid-row: auto; }
+}
+
+/* extra eth0 details (IPv6 local/public, MTU, gateway, MAC, DNS) at
+   the bottom of the net panel. 2 column-pairs ("label: value"), keeps
+   it compact horizontally so the panel doesn't grow much vertically. */
+.net-details {
+  /* 5px of breathing room above before the divider. */
+  margin-top: 5px;
+  padding-top: 2px;
+  border-top: 1px dotted var(--divider);
+  display: grid;
+  /* single label/value column so the IPv6 strings have the full panel
+     width to themselves (they're ~39 chars and never fit alongside
+     another pair in a 460px-wide panel). */
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 0 10px;
+  font-size: 11px;
+  line-height: 1.15;
+}
+.net-details .lbl { color: var(--txt-dim); }
+.net-details .val {
+  color: var(--hi);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+/* ───────────────────────────  PROC panel  ──────────────────── */
+
+/* Use CSS tables — header + data rows share a single column model so
+   widths line up no matter what's in each cell. Tables are the bullet-
+   proof choice when you need column widths driven by max content across
+   every row. */
+.proc-body {
+  display: flex;
+  flex-direction: column;
+  font-size: 12.5px;
+  line-height: 1.25;
+}
+.proc-table {
+  display: table;
+  width: 100%;
+  table-layout: fixed;
+  border-collapse: collapse;
+}
+.proc-rows { display: table-row-group; }
+.proc-row,
+.proc-rows .pr { display: table-row; }
+.proc-row > *,
+.proc-rows .pr > * {
+  display: table-cell;
+  padding: 0 4px;
+  vertical-align: baseline;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+/* fixed column widths — table-layout: fixed honours the first row's
+   declared widths and applies them to every row. */
+.proc-row .c-pid,  .proc-rows .pid  { width: 5em;   text-align: right;  }
+.proc-row .c-prog, .proc-rows .prog { width: 11em; }
+.proc-row .c-cmd,  .proc-rows .cmd  { width: auto; }
+.proc-row .c-thr,  .proc-rows .thr  { width: 5.5em; text-align: center; }
+.proc-row .c-mem,  .proc-rows .mem  { width: 6em;   text-align: right;  }
+.proc-row .c-cpu,  .proc-rows .cpu  { width: 5em;   text-align: right;  }
+
+.proc-rows .pr:nth-child(odd) { background: var(--proc-alt); }
+.proc-head {
+  color: var(--box-proc);
+  border-bottom: 1px dotted var(--divider);
+  padding-bottom: 2px;
+  margin-bottom: 2px;
+}
+.proc-head .c-pid,
+.proc-head .c-mem,
+.proc-head .c-cpu { text-align: right; }
+.proc-head .c-thr { text-align: center; }
+.proc-rows .pr {
+  color: var(--txt);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.proc-rows .pr:nth-child(odd) { background: var(--proc-alt); }
+.proc-rows .pr > * {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.proc-rows .pid  { color: var(--txt-dim); text-align: right; }
+.proc-rows .prog { color: var(--hi); }
+/* tree branch chars live inside .prog as muted greys */
+.proc-rows .prog .tree { color: var(--txt-dimmer); }
+.proc-rows .cmd  { color: var(--txt-dim); }
+.proc-rows .thr  { color: var(--txt); text-align: center; }
+.proc-rows .mem  { color: var(--txt); text-align: right; }
+.proc-rows .cpu  { color: var(--cpu-mid); text-align: right; }
+.proc-rows .cpu.hot   { color: var(--cpu-end); }
+.proc-rows .cpu.cold  { color: var(--txt-dim); }
+.proc-foot {
+  display: flex;
+  gap: 0;
+  align-items: center;
+  border-top: 1px dotted var(--divider);
+  margin-top: 4px;
+  padding: 2px 4px 0;
+  color: var(--txt-dim);
+}
+.proc-foot .sep2 { color: var(--divider); padding: 0 6px; }
+.proc-foot .hint { color: var(--txt); }
+.proc-foot .hint .hot { color: var(--accent); font-weight: 700; }
+.proc-foot .fill { flex: 1 1 auto; }
+
+/* slow-changing system info + 'monomi' logo on the right. The whole
+   strip is pinned to the bottom of the proc panel (margin-top: auto)
+   so the proc table flows naturally and any leftover vertical space
+   gets used. */
+.sysinfo-row {
+  margin-top: auto;
+  padding-top: 4px;
+  border-top: 1px dotted var(--divider);
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+}
+.sysinfo {
+  display: grid;
+  /* both columns size to content so the right-hand side leaves room
+     for the logo (was minmax(0, 1fr) which stretched to fill). */
+  grid-template-columns: max-content max-content;
+  gap: 0 10px;
+  font-size: 11px;
+  line-height: 1.18;
+  flex-shrink: 0;
+}
+.sysinfo .lbl { color: var(--txt-dim); }
+.sysinfo .val {
+  color: var(--hi);
+  white-space: nowrap;
+}
+/* 物見 (monomi) logo — kanji rasterised to braille via canvas in JS.
+   Bottom-right aligned, dim grey watermark. */
+.logo {
+  margin: 0 0 0 auto;
+  font-family: inherit;
+  font-size: 9px;
+  line-height: 1;
+  white-space: pre;
+  color: rgba(212, 212, 212, 0.35);
+  user-select: none;
+  pointer-events: none;
+}
+
+/* small screens — drop the wider columns so what's left stays readable */
+@media (max-width: 1200px) {
+  .proc-head .c-thr, .proc-rows .thr { display: none; }
+}
+@media (max-width: 760px) {
+  .proc-head .c-prog, .proc-rows .prog,
+  .proc-head .c-mem,  .proc-rows .mem { display: none; }
+}
+`;

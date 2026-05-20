@@ -1,0 +1,21 @@
+name = "monomi"
+main = "src/index.ts"
+compatibility_date = "2025-04-01"
+compatibility_flags = ["nodejs_compat"]
+
+# `wrangler dev` listens on 8787 by default.
+# Static assets ship inline from the worker rather than via the assets feature
+# so the whole page is one fetch round-trip.
+
+[[durable_objects.bindings]]
+name = "STATS"
+class_name = "StatsRoom"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["StatsRoom"]
+
+[vars]
+# Override with `wrangler secret put INGEST_TOKEN` for prod.
+# The default below only takes effect locally via wrangler dev.
+INGEST_TOKEN = "dev-token"

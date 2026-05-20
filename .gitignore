@@ -1,0 +1,11 @@
+node_modules/
+.wrangler/
+dist/
+.dev.vars
+*.log
+
+# editor / agent
+.vscode/
+.idea/
+.claude/
+.DS_Store

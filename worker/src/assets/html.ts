@@ -1,0 +1,159 @@
+// HTML for the status page (btop-style panel layout).
+export const INDEX_HTML = String.raw`<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>pi5 · status</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/style.css">
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23000'/><text x='16' y='24' font-family='monospace' font-size='22' fill='%23cbc06c' text-anchor='middle'>5</text></svg>">
+</head>
+<body>
+  <main class="screen">
+
+    <!-- ─────────────────────────  CPU  ───────────────────────── -->
+    <section class="panel cpu">
+      <header class="panel-head">
+        <span class="num">1</span>
+        <span class="bk">┤</span><span class="name">cpu</span><span class="bk">├</span>
+        <span class="fill"></span>
+        <span class="clock" id="hdr-time">--:--:--</span>
+      </header>
+      <div class="cpu-body">
+        <div class="cpu-graphs">
+          <pre class="g cpu-graph" id="cpu-graph"></pre>
+        </div>
+        <div class="cpu-stats">
+          <table class="cpu-table">
+            <tr><th>CPU</th><td class="v" id="v-cpu">--%</td><td class="t" id="v-cpu-temp">--°C</td><td class="f" id="cpu-freq">- GHz</td></tr>
+          </table>
+          <!-- per-core mini sparklines (4 rows): label · spark · pct -->
+          <div class="per-core" id="per-core-rows">
+            <span class="core-lbl">C0</span><pre class="core-spk" id="core-spk-0"></pre><span class="core-pct" id="v-c0">--%</span>
+            <span class="core-lbl">C1</span><pre class="core-spk" id="core-spk-1"></pre><span class="core-pct" id="v-c1">--%</span>
+            <span class="core-lbl">C2</span><pre class="core-spk" id="core-spk-2"></pre><span class="core-pct" id="v-c2">--%</span>
+            <span class="core-lbl">C3</span><pre class="core-spk" id="core-spk-3"></pre><span class="core-pct" id="v-c3">--%</span>
+          </div>
+          <table class="cpu-table" style="margin-top:4px;">
+            <tr class="load"><th>Load&nbsp;AVG:</th><td class="v" id="v-load1">--</td><td class="v" id="v-load5">--</td><td class="v" id="v-load15">--</td></tr>
+          </table>
+        </div>
+        <div class="uptime"><span id="uptime">up&nbsp;--</span></div>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────  MEM  ───────────────────────── -->
+    <section class="panel mem">
+      <header class="panel-head">
+        <span class="num">2</span>
+        <span class="bk">┤</span><span class="name">mem</span><span class="bk">├</span>
+      </header>
+      <div class="mem-body" id="mem-body">
+        <!-- populated by JS: rows of label + bar + value -->
+      </div>
+      <div class="memhist-block">
+        <div class="iface-label"><span class="name">history</span> &nbsp;<span id="mem-pct-now">--%</span></div>
+        <pre class="g memhist-graph" id="mem-graph"></pre>
+      </div>
+    </section>
+
+    <!-- ─────────────────────────  DISKS  ─────────────────────── -->
+    <section class="panel disks">
+      <header class="panel-head">
+        <span class="num">3</span>
+        <span class="bk">┤</span><span class="name">disks</span><span class="bk">├</span>
+      </header>
+      <div class="disks-body" id="disks-body">
+        <!-- populated by JS -->
+      </div>
+      <div class="diskio-block">
+        <div class="iface-label"><span class="name">i/o</span> &nbsp;<span id="diskio-now">--</span></div>
+        <pre class="g diskio-graph" id="diskio-graph"></pre>
+      </div>
+      <div class="swap-body" id="swap-body">
+        <!-- populated by JS when swap is configured -->
+      </div>
+    </section>
+
+    <!-- ─────────────────────────  NET  ───────────────────────── -->
+    <section class="panel net">
+      <header class="panel-head">
+        <span class="num">4</span>
+        <span class="bk">┤</span><span class="name">net</span><span class="bk">├</span>
+      </header>
+      <div class="net-body">
+        <div class="net-graph-block">
+          <div class="iface-label"><span class="name">eth0</span> &nbsp;<span id="eth-ip">--</span></div>
+          <pre class="g net-graph eth0" id="net-graph-eth0"></pre>
+        </div>
+        <div class="net-graph-block">
+          <div class="iface-label"><span class="name">wg0</span> &nbsp;<span id="wg-ip">--</span></div>
+          <pre class="g net-graph wg0" id="net-graph-wg0"></pre>
+        </div>
+        <div class="net-info">
+          <div class="net-block">
+            <div class="net-title">eth0 download</div>
+            <div class="net-row"><span class="ar dn">▼</span><span class="now" id="net-down-now">--</span></div>
+            <div class="net-row"><span class="ar dn">▼</span><span class="lbl">Top:</span><span class="num2" id="net-down-top">--</span></div>
+            <div class="net-row"><span class="ar dn">▼</span><span class="lbl">Total:</span><span class="num2" id="net-down-total">--</span></div>
+            <div class="net-title">eth0 upload</div>
+            <div class="net-row"><span class="ar up">▲</span><span class="now" id="net-up-now">--</span></div>
+            <div class="net-row"><span class="ar up">▲</span><span class="lbl">Top:</span><span class="num2" id="net-up-top">--</span></div>
+            <div class="net-row"><span class="ar up">▲</span><span class="lbl">Total:</span><span class="num2" id="net-up-total">--</span></div>
+          </div>
+          <div class="net-block">
+            <div class="net-title">wg0 (pia)</div>
+            <div class="net-row wg"><span class="ar dn">▼</span><span class="now" id="wg-down-now">--</span></div>
+            <div class="net-row wg"><span class="ar up">▲</span><span class="now" id="wg-up-now">--</span></div>
+          </div>
+        </div>
+      </div>
+      <div class="net-details" id="net-details">
+        <!-- populated by JS: IPv6 local/public, MTU, gateway, MAC, DNS -->
+      </div>
+    </section>
+
+    <!-- ─────────────────────────  PROC  ──────────────────────── -->
+    <section class="panel proc">
+      <header class="panel-head">
+        <span class="num">5</span>
+        <span class="bk">┤</span><span class="name">proc</span><span class="bk">├</span>
+        <span class="fill"></span>
+        <span class="menu"><span class="bk">&lt;</span> cpu lazy <span class="bk">&gt;</span></span>
+      </header>
+      <div class="proc-body">
+        <div class="proc-table">
+          <div class="proc-row proc-head">
+            <span class="c-pid">Pid:</span>
+            <span class="c-prog">Program:</span>
+            <span class="c-cmd">Command:</span>
+            <span class="c-thr">Threads:</span>
+            <span class="c-mem">Mem</span>
+            <span class="c-cpu">Cpu %</span>
+          </div>
+          <div class="proc-rows" id="proc-rows">
+            <!-- populated by JS -->
+          </div>
+        </div>
+        <div class="proc-foot" id="proc-foot">
+          <span class="fill"></span>
+          <span id="proc-count">0/0</span>
+        </div>
+        <div class="sysinfo-row">
+          <div class="sysinfo" id="sysinfo">
+            <!-- populated by JS -->
+          </div>
+          <pre class="logo" id="logo" aria-label="monomi"></pre>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <script src="/app.js"></script>
+</body>
+</html>
+`;
