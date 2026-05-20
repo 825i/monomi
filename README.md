@@ -1,6 +1,6 @@
 # monomi
 
-物見 — _your watchtower, always watching._
+物見, _your watchtower, always watching._
 
 A small, fast, browser-accessible status page and resource monitor for Linux. Clearly inspired by [btop](https://github.com/aristocratos/btop), but built to live on a small case-mounted screen or get pulled up in a tab whenever you want to see how your box is doing.
 
@@ -58,7 +58,7 @@ The collector is stateless. The Worker is one file plus three inlined assets. Th
 | --- | --- |
 | Collector | Python 3, standard library only (no `pip install`) |
 | Edge | Cloudflare Workers + a single Durable Object |
-| UI | ~780 lines vanilla JS, ~640 lines CSS, ~160 lines HTML — zero runtime deps |
+| UI | ~780 lines vanilla JS, ~640 lines CSS, ~160 lines HTML (zero runtime deps) |
 | Wire format | JSON over HTTPS, Bearer-token authenticated |
 | Cadence | 1 Hz push, 1 Hz browser poll |
 | Service unit | systemd (`Type=simple`, restart on failure) |
@@ -70,7 +70,7 @@ The collector is stateless. The Worker is one file plus three inlined assets. Th
 | Collector RSS on the host | ~25 MB |
 | Collector CPU at 1 Hz | <1% on a Pi 5 |
 | Disk usage | journald log lines only |
-| Cloudflare Worker requests | ~170k/day per viewer (push + poll) — well inside the free tier |
+| Cloudflare Worker requests | ~170k/day per viewer (push + poll), well inside the free tier |
 | Durable Object storage | <100 KB per host |
 | Page weight | one HTML doc, one JS file, one CSS file, all inlined into the Worker |
 
@@ -122,7 +122,30 @@ sudo systemctl enable --now monomi-collector
 
 Refresh the page in your browser. The dashboard starts ticking immediately.
 
-Total install time: under five minutes.
+Total install time: under five minutes if Cloudflare doesn't fight you. See the next section if you want a custom domain + auth gating.
+
+## Gating it behind Cloudflare Access
+
+Optional but recommended. The dashboard renders your public IP addresses and a NAT-traversal IP if you have one. Even with the CSS blur, the raw values are visible in `/api/stats` to anyone who can hit the URL. If you don't want that, put Cloudflare Access in front of the worker.
+
+```
+Zero Trust → Access → Applications → Add an application → Self-hosted
+  Application domain:    monomi.<your-domain>
+  Policy: <your usual login policy, e.g. Google + your email>
+```
+
+That gates the **viewing side** behind auth. But the Pi collector POSTs to `/ingest` once a second, and Access will block that too. You need a **second Access application** scoped to just that path:
+
+```
+Add a second application → Self-hosted
+  Application domain:    monomi.<your-domain>
+  Path:                  /ingest
+  Policy: Bypass, Selector = Everyone
+```
+
+Cloudflare's Access policies don't path-scope, only Applications do. A single app with two policies doesn't work, you need two apps, one per path scope. The more specific path (`/ingest`) wins for that endpoint.
+
+**WAF gotcha**: the collector sends a `User-Agent: monomi-collector/1.0` header on purpose because Cloudflare's default Browser Integrity Check blocks the bare `Python-urllib/X` UA with error 1010, silently looking identical to an Access redirect (both come back as 403 to the collector's urllib). If you fork the collector and strip the UA, ingest will mysteriously fail with the same symptoms.
 
 ## Configuration
 

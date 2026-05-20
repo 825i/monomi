@@ -3,6 +3,14 @@ main = "src/index.ts"
 compatibility_date = "2025-04-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Custom domain. CHANGE THIS to your own hostname before deploying —
+# the zone must already exist in your Cloudflare account, and wrangler
+# will create the DNS record on first deploy. Comment the whole block
+# out if you want to use the default *.workers.dev URL instead.
+routes = [
+  { pattern = "monomi.xtu.icu", custom_domain = true },
+]
+
 # `wrangler dev` listens on 8787 by default.
 # Static assets ship inline from the worker rather than via the assets feature
 # so the whole page is one fetch round-trip.
@@ -15,7 +23,7 @@ class_name = "StatsRoom"
 tag = "v1"
 new_sqlite_classes = ["StatsRoom"]
 
-[vars]
-# Override with `wrangler secret put INGEST_TOKEN` for prod.
-# The default below only takes effect locally via wrangler dev.
-INGEST_TOKEN = "dev-token"
+# INGEST_TOKEN lives in `wrangler secret put INGEST_TOKEN` in prod,
+# and in `.dev.vars` (gitignored) for local `wrangler dev`. We don't
+# declare it in [vars] here because anything in [vars] is uploaded
+# as a plain env var and would clobber the secret on every deploy.

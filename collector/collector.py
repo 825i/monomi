@@ -829,6 +829,10 @@ def send(snapshot: dict[str, Any]) -> None:
         headers={
             "Content-Type": "application/json",
             "Authorization": f"Bearer {INGEST_TOKEN}",
+            # Cloudflare's Browser Integrity Check blocks the default
+            # 'Python-urllib/X' UA with error 1010. Use a real UA so the
+            # ingest POST gets through the WAF before reaching the worker.
+            "User-Agent": "monomi-collector/1.0",
         },
     )
     with urllib.request.urlopen(req, timeout=5) as r:

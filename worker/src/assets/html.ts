@@ -9,7 +9,7 @@ export const INDEX_HTML = String.raw`<!doctype html>
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;700&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="/style.css">
-  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><rect width='32' height='32' fill='%23000'/><text x='16' y='24' font-family='monospace' font-size='22' fill='%23cbc06c' text-anchor='middle'>5</text></svg>">
+  <link rel="icon" href="data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 32 32'><text x='16' y='24' font-family='sans-serif' font-size='15' font-weight='700' fill='%23d4d4d4' text-anchor='middle'>物見</text></svg>">
 </head>
 <body>
   <main class="screen">
