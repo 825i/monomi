@@ -754,8 +754,12 @@ function kanjiToBraille(text, fontSize) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// polling
+// polling — self-rescheduling so requests can't overlap when the network
+// round-trip happens to be longer than POLL_MS (which causes the cadence
+// to feel inconsistent: 1s here, 2s there, 3s next).
 // ─────────────────────────────────────────────────────────────────────────────
+let pollTimer = null;
+
 async function poll() {
   try {
     const r = await fetch("/api/stats", { cache: "no-store" });
@@ -764,18 +768,23 @@ async function poll() {
     paint(body);
   } catch (e) {
     console.warn("poll failed:", e);
+  } finally {
+    if (pollTimer) clearTimeout(pollTimer);
+    pollTimer = setTimeout(poll, POLL_MS);
   }
 }
 
 (function init() {
-  poll();
-  setInterval(poll, POLL_MS);
+  poll();   // kicks the self-rescheduling loop
   // one-shot: rasterise the monomi kanji into the logo slot.
   const logoEl = document.getElementById("logo");
   if (logoEl) logoEl.textContent = kanjiToBraille("物見", 32);
   let rzt = null;
   window.addEventListener("resize", () => {
     if (rzt) clearTimeout(rzt);
-    rzt = setTimeout(poll, 100);
+    rzt = setTimeout(() => {
+      if (pollTimer) clearTimeout(pollTimer);
+      poll();
+    }, 100);
   });
 })();
