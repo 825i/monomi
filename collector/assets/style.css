@@ -178,9 +178,8 @@ body { padding: 10px 6px 5px; }
   background: var(--panel-border);
   padding: 0;
 }
-.panel-head .clock     { color: var(--hi); padding: 0 6px; }
-.panel-head .rate-ctrl { color: var(--hi); padding: 0 6px 0 0; }
-.panel-head .rate-dim  { color: var(--panel-border); }
+.panel-head .clock   { color: var(--hi); padding: 0 6px; }
+.panel-head .rate-ms { color: var(--txt-dim); padding: 0 6px 0 0; }
 
 /* ───────────────────────────  CPU panel  ───────────────────── */
 

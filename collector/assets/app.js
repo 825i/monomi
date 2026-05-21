@@ -1,10 +1,9 @@
 /* eslint-disable */
 "use strict";
 
-// Browser poll cadence. Matches the server's INTERVAL by default so
-// the page repaints as fast as the collector refreshes. Cheap because
-// everything runs on the host now (no edge worker, no request budget).
-const POLL_MS = 500;
+// Browser poll cadence. Matches the server's INTERVAL (1s default) so
+// every poll lines up with a fresh snapshot, no overlap, steady cadence.
+const POLL_MS = 1000;
 const $ = (id) => document.getElementById(id);
 
 document.getElementById("rate-ms") && (document.getElementById("rate-ms").textContent = POLL_MS + "ms");

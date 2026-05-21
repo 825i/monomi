@@ -34,10 +34,10 @@ from typing import Any
 # Configuration
 # ---------------------------------------------------------------------------
 
-# How often the collector samples /proc + /sys etc. Lower = livelier
-# updates but more host work. 0.5s feels properly real-time on a Pi 5;
-# bump higher if you're running on something smaller.
-INTERVAL = float(os.environ.get("INTERVAL", "0.5"))
+# How often the collector samples /proc + /sys etc. 1s matches the
+# default browser poll cadence so paints land on each new snapshot
+# cleanly. Lower it for snappier updates if your host can keep up.
+INTERVAL = float(os.environ.get("INTERVAL", "1.0"))
 
 # Where the HTTP server listens. localhost is correct when a tunnel
 # fronts the service. Set BIND_ADDR=0.0.0.0 to expose on the LAN.
