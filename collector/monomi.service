@@ -1,5 +1,5 @@
 [Unit]
-Description=monomi collector — bundles telemetry and POSTs to the edge worker
+Description=monomi — Linux status page and resource monitor
 After=network-online.target
 Wants=network-online.target
 
@@ -8,8 +8,8 @@ Type=simple
 User=root
 Group=root
 WorkingDirectory=/opt/monomi
-EnvironmentFile=/etc/monomi/collector.env
-ExecStart=/usr/bin/python3 /opt/monomi/collector.py
+EnvironmentFile=-/etc/monomi/monomi.env
+ExecStart=/usr/bin/python3 /opt/monomi/monomi.py
 Restart=always
 RestartSec=5
 StandardOutput=journal

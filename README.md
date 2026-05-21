@@ -10,13 +10,13 @@ The style automatically resizes for slim portrait monitors or PC cases (not pict
 
 ## What it is
 
-You run a tiny Python collector on the machine you want to watch. Every second it bundles CPU, memory, swap, disk, network, processes, services, and a handful of static system facts into a JSON snapshot and POSTs it to a Cloudflare Worker. The Worker keeps the latest snapshot plus a 6-minute rolling history in a single Durable Object and serves a self-contained HTML/CSS/JS page that reads from it. Your browser polls once a second and repaints.
+You run one Python process on the machine you want to watch. It does the lot: gathers a /proc + /sys snapshot every couple of seconds, holds a few minutes of rolling history in memory, and serves a self-contained HTML/CSS/JS dashboard on a local port. Your browser polls that port and repaints. To expose it to the outside world you stick a Cloudflare Tunnel (or nginx, or Tailscale, or whatever you already use) in front of it.
 
-That's the whole thing. No database, no Docker, no Python web framework, no JavaScript build step on the host. About 2,600 lines of code total.
+That's the whole thing. No database, no Docker required, no Python web framework, no JavaScript build step, no remote backend, no API rate limit. About 2,600 lines of code total. Standard library only on the server side, vanilla JS on the client side.
 
 ## Features
 
-- **Live updates every 2 seconds** with sub-100ms repaint, no flicker (configurable down to 1 Hz on paid Workers tier)
+- **Live updates every 2 seconds** with sub-100ms repaint, no flicker (tunable down to 1 Hz or whatever you want)
 - **Braille graphs** in the spirit of btop, with water-reflection mirror mode for CPU and network
 - **Per-core sparklines** coloured green to red along btop's CPU gradient
 - **Memory + swap as bucket fills** showing each metric as a filling glass
@@ -25,141 +25,133 @@ That's the whole thing. No database, no Docker, no Python web framework, no Java
 - **Top 40 processes** by CPU, sorted live
 - **System info footer**: OS, kernel, model, arch, GPU, shell, package count, last `apt` run, UPS state
 - **Responsive layout** that holds up from 1920px down to mobile
-- **No data leaves your edge.** Worker is in your Cloudflare account, history lives in your Durable Object, the page polls only your endpoint.
+- **Fully self-hosted.** No external service required to run it. Your data never leaves your box unless you put it on the internet yourself.
 
 ## Why
 
-I wanted a glanceable status page for my home Pi 5 that I didn't have to SSH in to check. btop is gorgeous but it's a TTY app. Existing web monitors (Glances, Netdata, Cockpit, etc.) felt heavyweight: Python web stacks, gigabytes of historical metrics, paid tiers, big install footprints. I wanted the smallest possible thing that looked good, updated live, and could leave open on a small case display without melting the host.
+I wanted a glanceable status page for my home Pi 5 that I didn't have to SSH in to check. btop is gorgeous but it's a TTY app. Existing web monitors (Glances, Netdata, Cockpit, etc.) felt heavyweight: Python web stacks, gigabytes of historical metrics, paid tiers, big install footprints. I wanted the smallest possible thing that looked good, updated live, ran fully on the host, and could leave open on a small case display without melting the Pi.
 
 ## How it works
 
 ```
-   ┌──────────────┐                        ┌──────────────────┐
-   │  Linux box   │  POST 1Hz, Bearer auth │   Cloudflare     │
-   │              │ ─────── JSON ───────▶  │      Worker      │
-   │  collector   │                        │                  │
-   │  (Python 3,  │                        │  Durable Object  │
-   │   stdlib)    │                        │  latest + 360s   │
-   └──────────────┘                        │     history      │
-                                           └────────┬─────────┘
-                                                    │  GET /  +  /api/stats
-                                                    ▼
-                                           ┌──────────────────┐
-                                           │   Any browser    │
-                                           │   polls 1Hz      │
-                                           └──────────────────┘
+   ┌─────────────────────────────────────────┐
+   │             Linux box                   │
+   │                                         │
+   │   ┌─────────────────────────────────┐   │
+   │   │  monomi.py                      │   │
+   │   │                                 │   │
+   │   │  collector thread ─┐            │   │
+   │   │   (every 2 s)      ▼            │   │
+   │   │    /proc, /sys ─▶ in-memory     │   │
+   │   │    smartctl,      state +       │   │
+   │   │    upsc, ps        history      │   │
+   │   │                     ▲           │   │
+   │   │  HTTP server ───────┘           │   │
+   │   │   on 127.0.0.1:8080             │   │
+   │   └─────────────────────────────────┘   │
+   │                  ▲                      │
+   │                  │   /  /api/stats      │
+   └──────────────────┼──────────────────────┘
+                      │
+            ┌─────────┴──────────┐
+            │  Any browser       │
+            │  polls every 2 s   │
+            └────────────────────┘
 ```
 
-The collector is stateless. The Worker is one file plus three inlined assets. The browser is vanilla JS, no framework, no build step it needs to know about.
+One Python process. The collector thread refreshes shared state; the HTTP server reads it. Browser polls `/api/stats` and repaints. The static HTML/CSS/JS files in `collector/assets/` are served from disk by the same server.
 
 ## Tech stack
 
 | Layer | Tech |
 | --- | --- |
-| Collector | Python 3, standard library only (no `pip install`) |
-| Edge | Cloudflare Workers + a single Durable Object |
+| Backend | Python 3, standard library only (no `pip install`) |
+| Server | `http.server.ThreadingHTTPServer` |
 | UI | ~780 lines vanilla JS, ~640 lines CSS, ~160 lines HTML (zero runtime deps) |
-| Wire format | JSON over HTTPS, Bearer-token authenticated |
-| Cadence | 2 s push + 2 s browser poll by default (tunable; 1 Hz lands on Cloudflare's paid Workers tier) |
+| Wire format | JSON over HTTP |
+| Cadence | 2 s collector + 2 s browser poll by default (set `INTERVAL` to tune) |
 | Service unit | systemd (`Type=simple`, restart on failure) |
 
 ## Footprint
 
 | Resource | Cost |
 | --- | --- |
-| Collector RSS on the host | ~25 MB |
-| Collector CPU at 1 Hz | <1% on a Pi 5 |
+| RSS on the host | ~25 MB |
+| CPU at 2 s cadence | <1% on a Pi 5 |
 | Disk usage | journald log lines only |
-| Cloudflare Worker requests | ~170k/day per viewer (push + poll), well inside the free tier |
-| Durable Object storage | <100 KB per host |
-| Page weight | one HTML doc, one JS file, one CSS file, all inlined into the Worker |
+| Page weight | one HTML doc, one JS file, one CSS file, served from disk |
+| External services | none |
 
 The whole project is built around the constraint that nothing should consume more than a sliver of resources.
 
 ## Quick start
 
-You need a Cloudflare account (free tier is fine), Node 18+, and SSH to whatever Linux box you want to monitor.
-
-### 1. Deploy the edge
-
-```sh
-git clone https://github.com/<you>/monomi.git
-cd monomi/worker
-npm install
-npx wrangler login
-npx wrangler secret put INGEST_TOKEN     # paste a long random string
-npx wrangler deploy
-```
-
-Wrangler will print the URL, something like `https://monomi.<sub>.workers.dev`. Hit it in a browser to confirm the page loads (it'll show `--` everywhere until the collector starts pushing).
-
-### 2. Install the collector
+Two files go on the host: `monomi.py` and the `assets/` directory next to it. One systemd unit starts it.
 
 From your laptop:
 
 ```sh
-cd ../collector
-scp collector.py monomi-collector.service user@host:/tmp/
+git clone https://github.com/825i/monomi.git
+cd monomi/collector
+scp -r monomi.py assets monomi.service monomi.env.example user@host:/tmp/monomi-install/
 ```
 
 On the host:
 
 ```sh
 sudo install -d /opt/monomi /etc/monomi
-sudo install -m 0755 /tmp/collector.py /opt/monomi/
-sudo install -m 0644 /tmp/monomi-collector.service /etc/systemd/system/monomi-collector.service
+sudo install -m 0755 /tmp/monomi-install/monomi.py /opt/monomi/
+sudo cp -r /tmp/monomi-install/assets /opt/monomi/
+sudo install -m 0644 /tmp/monomi-install/monomi.service /etc/systemd/system/
 
-sudo tee /etc/monomi/collector.env >/dev/null <<EOF
-INGEST_URL=https://monomi.<your-sub>.workers.dev/ingest
-INGEST_TOKEN=<the same long random string from step 1>
-INTERVAL=1.0
-EOF
-sudo chmod 600 /etc/monomi/collector.env
+sudo cp /tmp/monomi-install/monomi.env.example /etc/monomi/monomi.env
+sudo chmod 600 /etc/monomi/monomi.env
+# edit /etc/monomi/monomi.env to taste (defaults are sane)
 
 sudo systemctl daemon-reload
-sudo systemctl enable --now monomi-collector
+sudo systemctl enable --now monomi
+sudo systemctl status monomi --no-pager
 ```
 
-Refresh the page in your browser. The dashboard starts ticking immediately.
+By default the server listens on `127.0.0.1:8080`. Either:
 
-Total install time: under five minutes if Cloudflare doesn't fight you. See the next section if you want a custom domain + auth gating.
+- **LAN access only**: set `BIND_ADDR=0.0.0.0` in `/etc/monomi/monomi.env` and browse to `http://<host-ip>:8080/`.
+- **Public access**: put a tunnel or reverse proxy in front of `127.0.0.1:8080`. See the next section.
 
-## Gating it behind Cloudflare Access
+Total install time: under three minutes.
 
-Optional but recommended. The dashboard renders your public IP addresses and a NAT-traversal IP if you have one. Even with the CSS blur, the raw values are visible in `/api/stats` to anyone who can hit the URL. If you don't want that, put Cloudflare Access in front of the worker.
+## Putting it on the public internet
 
-```
-Zero Trust → Access → Applications → Add an application → Self-hosted
-  Application domain:    monomi.<your-domain>
-  Policy: <your usual login policy, e.g. Google + your email>
-```
+monomi binds to localhost by default, on purpose. To expose it, pick whichever tunnel or reverse proxy you already trust. A few common shapes:
 
-That gates the **viewing side** behind auth. But the Pi collector POSTs to `/ingest` once a second, and Access will block that too. You need a **second Access application** scoped to just that path:
+**Cloudflare Tunnel** (great if your IP changes or you don't want to forward ports):
 
-```
-Add a second application → Self-hosted
-  Application domain:    monomi.<your-domain>
-  Path:                  /ingest
-  Policy: Bypass, Selector = Everyone
-```
+1. Zero Trust → Networks → Tunnels → pick your existing tunnel → Public Hostnames → Add
+2. Subdomain: `monomi`, Domain: your zone, Service: `HTTP`, URL: `localhost:8080`
+3. Optionally add a Cloudflare Access policy on the same hostname to gate it behind SSO
 
-Cloudflare's Access policies don't path-scope, only Applications do. A single app with two policies doesn't work, you need two apps, one per path scope. The more specific path (`/ingest`) wins for that endpoint.
+Because the server serves both the page and the JSON from the same path, you don't need any path-scoped bypass tricks. One Access app, one policy, done.
 
-**WAF gotcha**: the collector sends a `User-Agent: monomi-collector/1.0` header on purpose because Cloudflare's default Browser Integrity Check blocks the bare `Python-urllib/X` UA with error 1010, silently looking identical to an Access redirect (both come back as 403 to the collector's urllib). If you fork the collector and strip the UA, ingest will mysteriously fail with the same symptoms.
+**Tailscale**: nothing extra needed. `http://<tailscale-name>:8080/` reaches it directly from any device on your tailnet.
+
+**Nginx / Caddy / Traefik**: standard reverse proxy to `127.0.0.1:8080`. monomi sets `Cache-Control: no-store` on the JSON endpoint, so no fiddling required.
 
 ## Configuration
 
-`/etc/monomi/collector.env`:
+`/etc/monomi/monomi.env`:
 
 ```
-INGEST_URL=https://monomi.<sub>.workers.dev/ingest
-INGEST_TOKEN=<random>
-INTERVAL=1.0                              # push cadence in seconds
-PIRONMAN_URL=http://127.0.0.1:34001/...   # optional, for Pironman 5 case stats
-NUT_UPS=eaton3s                           # optional, NUT UPS name
+INTERVAL=2.0                                # snapshot cadence (seconds)
+BIND_ADDR=127.0.0.1                         # 0.0.0.0 to expose on LAN
+PORT=8080
+HISTORY_CAP=360                             # ~12 minutes at INTERVAL=2.0
+
+# Optional integrations. Comment out if you don't use them
+PIRONMAN_URL=http://127.0.0.1:34001/api/v1.0/get-data
+NUT_UPS=eaton3s
 ```
 
-The watched-services list lives at the top of `collector/collector.py`. Edit it for whatever you care about (`ssh`, `docker`, `nginx`, `postgres`, ...).
+The watched-services list and the pool device list both live at the top of `monomi.py`. Edit for whatever you care about.
 
 ## Compatibility
 
@@ -177,18 +169,18 @@ monomi was built on a Raspberry Pi 5 in a Pironman 5 case, but the bulk of what 
 | CPU temp, frequency, fan, per-core %, mem%, throttle | Pironman 5 local API (Pi-specific) |
 | Tunnel interface (wg0) inside a Docker netns | Optional, via `nsenter` |
 
-If you run it on a generic Linux server without Pironman, CPU temperature and per-core percentages currently come up empty. The rest works as is. Adding a fallback that reads `/proc/stat` plus `/sys/class/thermal/thermal_zone0/temp` is on the roadmap (see below) and is a small change.
+If you run it on a generic Linux server without Pironman, CPU temperature and per-core percentages currently come up empty. The rest works as is. Adding a fallback that reads `/proc/stat` plus `/sys/class/thermal/thermal_zone0/temp` is on the roadmap and is a small change.
 
 ## Hacking on it
 
-`worker/src/assets/{html,css,js}.ts` are the entire UI as exported template strings. `wrangler dev` hot-reloads on save.
+`collector/assets/{index.html,style.css,app.js}` are the entire UI. Edit them, restart the service, refresh.
 
 ```sh
-cd worker
-npx wrangler dev --port 8787 --ip 0.0.0.0
+# locally, with auto-restart on save (Pi5 is fast enough that file-watching is fine)
+sudo systemctl restart monomi
 ```
 
-Then point your collector at `http://<laptop-lan-ip>:8787/ingest` instead of the deployed URL, restart the systemd unit, and watch the page at `http://localhost:8787/` repaint live as you edit.
+For ergonomic dev: run `monomi.py` straight from your checkout on the Pi or any Linux box, point your browser at `http://localhost:8080/`, edit the assets, restart. No build step.
 
 ## Roadmap
 
@@ -196,9 +188,9 @@ Then point your collector at `http://<laptop-lan-ip>:8787/ingest` instead of the
 - Configurable layout (drop/add panels via JSON config, no recompile)
 - GPU stats for boxes with discrete GPUs
 - Per-process CPU heatmap
-- Standalone self-hosted backend (a tiny Go or Node binary that replaces the Cloudflare Worker, for people who don't want the edge dependency)
-- Debian + Arch packages so you can `apt install monomi-collector` or `yay -S monomi-collector`
-- Container image for the collector
+- Debian + Arch packages so you can `apt install monomi` or `yay -S monomi`
+- Container image
+- Optional WebSocket transport instead of polling, for the lowest possible latency
 
 If you want any of these and can write code, please open a PR.
 
@@ -216,7 +208,6 @@ Also indebted to:
 
 - [Pironman5](https://github.com/sunfounder/pironman5) for the Pi 5 case telemetry API
 - [NUT (Network UPS Tools)](https://networkupstools.org/) for the UPS data plumbing
-- [Cloudflare Workers](https://workers.cloudflare.com/) for making the edge free for hobbyists
 
 ---
 

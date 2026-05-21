@@ -1,5 +1,4 @@
-// Client logic — poll /api/stats and paint the panels.
-export const APP_JS = String.raw`/* eslint-disable */
+/* eslint-disable */
 "use strict";
 
 // Browser poll cadence. 2s gives a near-live feel while keeping daily
@@ -781,4 +780,3 @@ async function poll() {
     rzt = setTimeout(poll, 100);
   });
 })();
-`;

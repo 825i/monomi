@@ -1,6 +1,4 @@
-// Page stylesheet. Palette + structure match btop's default theme so the
-// page looks like the terminal app it's mimicking.
-export const STYLE_CSS = String.raw`
+
 :root {
   /* core (btop Default_theme) */
   --bg:         #000000;   /* main_bg */
@@ -641,4 +639,3 @@ body { padding: 10px 6px 5px; }
   .proc-head .c-prog, .proc-rows .prog,
   .proc-head .c-mem,  .proc-rows .mem { display: none; }
 }
-`;
