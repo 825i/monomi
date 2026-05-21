@@ -31,10 +31,10 @@ INGEST_URL = os.environ.get(
     "INGEST_URL", "http://localhost:8787/ingest"
 )
 INGEST_TOKEN = os.environ.get("INGEST_TOKEN", "dev-token")
-# Push cadence in seconds. Default 5.0 keeps daily Worker invocations
-# comfortably under Cloudflare's free tier (100k/day). Set to 1.0 only
-# if you're on the paid Workers tier.
-INTERVAL = float(os.environ.get("INTERVAL", "5.0"))
+# Push cadence in seconds. Default 2.0 sends ~43k/day, leaving headroom
+# under Cloudflare's free tier (100k/day) for browser polling. Bump to
+# 1.0 only on the paid Workers tier.
+INTERVAL = float(os.environ.get("INTERVAL", "2.0"))
 PROC_LIMIT = int(os.environ.get("PROC_LIMIT", "40"))
 PIRONMAN_URL = os.environ.get(
     "PIRONMAN_URL", "http://127.0.0.1:34001/api/v1.0/get-data"

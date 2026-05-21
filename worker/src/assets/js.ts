@@ -2,10 +2,11 @@
 export const APP_JS = String.raw`/* eslint-disable */
 "use strict";
 
-// Browser poll cadence. 5s keeps daily Worker invocations comfortably
-// inside Cloudflare's free tier (100k/day) — one collector + one tab
-// open all day works out to ~34k/day at this rate.
-const POLL_MS = 5000;
+// Browser poll cadence. 2s gives a near-live feel while keeping daily
+// Worker invocations under Cloudflare's free tier (100k/day): collector
+// at 2s = 43k/day, plus a few hours of viewing per day stays well under
+// the cap. Don't leave a tab open 24/7 on this setting.
+const POLL_MS = 2000;
 const $ = (id) => document.getElementById(id);
 
 document.getElementById("rate-ms") && (document.getElementById("rate-ms").textContent = POLL_MS + "ms");
