@@ -2,7 +2,10 @@
 export const APP_JS = String.raw`/* eslint-disable */
 "use strict";
 
-const POLL_MS = 1000;
+// Browser poll cadence. 5s keeps daily Worker invocations comfortably
+// inside Cloudflare's free tier (100k/day) — one collector + one tab
+// open all day works out to ~34k/day at this rate.
+const POLL_MS = 5000;
 const $ = (id) => document.getElementById(id);
 
 document.getElementById("rate-ms") && (document.getElementById("rate-ms").textContent = POLL_MS + "ms");

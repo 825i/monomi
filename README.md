@@ -16,7 +16,7 @@ That's the whole thing. No database, no Docker, no Python web framework, no Java
 
 ## Features
 
-- **Live 1Hz updates** with sub-100ms repaint, no flicker
+- **Live updates every 5 seconds** with sub-100ms repaint, no flicker (configurable down to 1 Hz on paid Workers tier)
 - **Braille graphs** in the spirit of btop, with water-reflection mirror mode for CPU and network
 - **Per-core sparklines** coloured green to red along btop's CPU gradient
 - **Memory + swap as bucket fills** showing each metric as a filling glass
@@ -60,7 +60,7 @@ The collector is stateless. The Worker is one file plus three inlined assets. Th
 | Edge | Cloudflare Workers + a single Durable Object |
 | UI | ~780 lines vanilla JS, ~640 lines CSS, ~160 lines HTML (zero runtime deps) |
 | Wire format | JSON over HTTPS, Bearer-token authenticated |
-| Cadence | 1 Hz push, 1 Hz browser poll |
+| Cadence | 5 s push + 5 s browser poll by default (tunable; 1 Hz lands on Cloudflare's paid Workers tier) |
 | Service unit | systemd (`Type=simple`, restart on failure) |
 
 ## Footprint
