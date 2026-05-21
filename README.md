@@ -16,7 +16,7 @@ That's the whole thing. No database, no Docker required, no Python web framework
 
 ## Features
 
-- **Live updates every 2 seconds** with sub-100ms repaint, no flicker (tunable down to 1 Hz or whatever you want)
+- **Live updates twice a second** (500 ms cadence default) with sub-100ms repaint, no flicker. Tunable up or down via `INTERVAL`.
 - **Braille graphs** in the spirit of btop, with water-reflection mirror mode for CPU and network
 - **Per-core sparklines** coloured green to red along btop's CPU gradient
 - **Memory + swap as bucket fills** showing each metric as a filling glass
@@ -41,7 +41,7 @@ I wanted a glanceable status page for my home Pi 5 that I didn't have to SSH in 
    │   │  monomi.py                      │   │
    │   │                                 │   │
    │   │  collector thread ─┐            │   │
-   │   │   (every 2 s)      ▼            │   │
+   │   │   (every 500 ms)    ▼            │   │
    │   │    /proc, /sys ─▶ in-memory     │   │
    │   │    smartctl,      state +       │   │
    │   │    upsc, ps        history      │   │
@@ -55,7 +55,7 @@ I wanted a glanceable status page for my home Pi 5 that I didn't have to SSH in 
                       │
             ┌─────────┴──────────┐
             │  Any browser       │
-            │  polls every 2 s   │
+            │  polls every 500ms │
             └────────────────────┘
 ```
 
@@ -69,7 +69,7 @@ One Python process. The collector thread refreshes shared state; the HTTP server
 | Server | `http.server.ThreadingHTTPServer` |
 | UI | ~780 lines vanilla JS, ~640 lines CSS, ~160 lines HTML (zero runtime deps) |
 | Wire format | JSON over HTTP |
-| Cadence | 2 s collector + 2 s browser poll by default (set `INTERVAL` to tune) |
+| Cadence | 500 ms collector + 500 ms browser poll by default (set `INTERVAL` to tune) |
 | Service unit | systemd (`Type=simple`, restart on failure) |
 
 ## Footprint
@@ -77,7 +77,7 @@ One Python process. The collector thread refreshes shared state; the HTTP server
 | Resource | Cost |
 | --- | --- |
 | RSS on the host | ~25 MB |
-| CPU at 2 s cadence | <1% on a Pi 5 |
+| CPU at 500 ms cadence | ~1% on a Pi 5 |
 | Disk usage | journald log lines only |
 | Page weight | one HTML doc, one JS file, one CSS file, served from disk |
 | External services | none |
@@ -141,10 +141,10 @@ Because the server serves both the page and the JSON from the same path, you don
 `/etc/monomi/monomi.env`:
 
 ```
-INTERVAL=2.0                                # snapshot cadence (seconds)
+INTERVAL=0.5                                # snapshot cadence (seconds)
 BIND_ADDR=127.0.0.1                         # 0.0.0.0 to expose on LAN
 PORT=8080
-HISTORY_CAP=360                             # ~12 minutes at INTERVAL=2.0
+HISTORY_CAP=360                             # 3 minutes at INTERVAL=0.5
 
 # Optional integrations. Comment out if you don't use them
 PIRONMAN_URL=http://127.0.0.1:34001/api/v1.0/get-data
