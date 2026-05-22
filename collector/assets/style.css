@@ -185,7 +185,13 @@ body { padding: 10px 6px 5px; }
 
 .cpu-body {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  /* Right column is fixed at 240px, not 'auto'. Otherwise the
+     per-core <pre> elements' intrinsic max-content can grow each
+     tick (font metrics for braille glyphs differ across OSes —
+     Windows in particular renders them wider than Mac's fallback),
+     which makes the right column slowly expand left and eat the
+     graph. Fixed 240 locks the layout. */
+  grid-template-columns: minmax(0, 1fr) 240px;
   gap: 8px 14px;
   align-items: stretch;
 }
