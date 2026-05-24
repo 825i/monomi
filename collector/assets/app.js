@@ -847,13 +847,19 @@ function kanjiToBraille(text, fontSize) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// polling — self-rescheduling so requests can't overlap when the network
-// round-trip happens to be longer than POLL_MS (which causes the cadence
-// to feel inconsistent: 1s here, 2s there, 3s next).
+// polling — self-rescheduling so requests can't overlap when the
+// network round-trip happens to be longer than POLL_MS. The wait is
+// `POLL_MS - elapsed` rather than a flat `POLL_MS`, so the next fetch
+// starts a full POLL_MS after THIS one started (not after it finished).
+// Without that compensation, every cycle would be `latency + POLL_MS`
+// and the browser would drift past the server's 1 Hz emission, missing
+// a snapshot every few seconds (visible as the clock ticking 8:01,
+// 8:02, 8:03, 8:05, 8:06, 8:07, 8:09, ...).
 // ─────────────────────────────────────────────────────────────────────────────
 let pollTimer = null;
 
 async function poll() {
+  const cycleStart = Date.now();
   try {
     const r = await fetch("/api/stats", { cache: "no-store" });
     if (!r.ok) throw new Error("HTTP " + r.status);
@@ -863,7 +869,11 @@ async function poll() {
     console.warn("poll failed:", e);
   } finally {
     if (pollTimer) clearTimeout(pollTimer);
-    pollTimer = setTimeout(poll, POLL_MS);
+    const elapsed = Date.now() - cycleStart;
+    // Latency spike longer than POLL_MS? Re-poll asap so we catch up
+    // (Math.max keeps us off a tight 0ms loop while recovering).
+    const wait = Math.max(50, POLL_MS - elapsed);
+    pollTimer = setTimeout(poll, wait);
   }
 }
 
