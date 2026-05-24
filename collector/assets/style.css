@@ -205,14 +205,21 @@ body { padding: 10px 6px 5px; }
 /* Braille glyphs (the .g block plus everything below that uses braille
    chars) need a font whose braille range (U+2800–U+28FF) is monospace.
    IBM Plex Mono doesn't ship braille, so on Windows the browser falls
-   back to Segoe UI Symbol — which has braille but is proportional,
+   back to Segoe UI Symbol, which has braille but is proportional,
    causing rows to misalign and the logo to look slanted. Consolas,
    Cascadia Mono and DejaVu Sans Mono all have monospace braille and
-   are present on Windows / Linux / Mac respectively. */
-.g, .core-spk, .hbar, .bucket, .memhist-graph, .diskio-graph, .logo {
+   are present on Windows / Linux / Mac respectively.
+   The descendant rule reinforces this on the inline spans we wrap
+   around graph rows for per-row colouring, otherwise the body's
+   font-feature-settings: "tnum" leaks through and re-introduces
+   proportional metrics on Windows. */
+.g, .core-spk, .hbar, .bucket, .memhist-graph, .diskio-graph, .logo,
+.g *, .core-spk *, .hbar *, .bucket *, .memhist-graph *, .diskio-graph *, .logo * {
   font-family: Consolas, "Cascadia Mono", "DejaVu Sans Mono",
-               Menlo, "Liberation Mono", monospace;
+               Menlo, "Liberation Mono", monospace !important;
   font-variant-ligatures: none;
+  font-variant-numeric: normal;
+  font-feature-settings: normal;
   letter-spacing: 0;
 }
 
