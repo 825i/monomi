@@ -202,38 +202,42 @@ body { padding: 10px 6px 5px; }
   min-width: 0;
   justify-content: center;
 }
-/* Braille glyphs (the .g block plus everything below that uses braille
-   chars) need a font whose braille range (U+2800–U+28FF) is monospace.
-   IBM Plex Mono doesn't ship braille, so on Windows the browser falls
-   back to Segoe UI Symbol, which has braille but is proportional,
-   causing rows to misalign and the logo to look slanted. Consolas,
-   Cascadia Mono and DejaVu Sans Mono all have monospace braille and
-   are present on Windows / Linux / Mac respectively.
-   The descendant rule reinforces this on the inline spans we wrap
-   around graph rows for per-row colouring, otherwise the body's
-   font-feature-settings: "tnum" leaks through and re-introduces
-   proportional metrics on Windows. */
-.g, .core-spk, .hbar, .bucket, .memhist-graph, .diskio-graph, .logo,
-.g *, .core-spk *, .hbar *, .bucket *, .memhist-graph *, .diskio-graph *, .logo * {
-  font-family: Consolas, "Cascadia Mono", "DejaVu Sans Mono",
+/* Smaller braille elements (per-core sparks, horizontal fill bars, mem
+   buckets) are still rendered as HTML text, so they need a font whose
+   braille range (U+2800–U+28FF) is monospace. IBM Plex Mono doesn't
+   ship braille, so on Windows the browser falls back to Segoe UI
+   Symbol, which has braille but is proportional, causing rows to
+   misalign. Consolas, Cascadia Mono and DejaVu Sans Mono all have
+   monospace braille and are present on Windows / Linux / Mac.
+   The large multi-row braille blocks (cpu, mem history, disk i/o,
+   net interfaces, logo) all render via <canvas> in app.js to bypass
+   DirectWrite per-glyph sub-pixel positioning — none of the rules
+   below apply to them. */
+.core-spk, .hbar, .bucket,
+.core-spk *, .hbar *, .bucket * {
+  font-family: "Cascadia Mono", Consolas, "DejaVu Sans Mono",
                Menlo, "Liberation Mono", monospace !important;
-  font-variant-ligatures: none;
-  font-variant-numeric: normal;
-  font-feature-settings: normal;
-  letter-spacing: 0;
+  font-variant-ligatures: none !important;
+  font-variant-numeric: normal !important;
+  font-variant-east-asian: normal !important;
+  font-feature-settings: "kern" 0, "liga" 0, "calt" 0 !important;
+  font-kerning: none !important;
+  letter-spacing: 0 !important;
+  text-rendering: optimizeSpeed !important;
+  direction: ltr;
+  text-align: left;
 }
 
-.g {
-  margin: 0;
-  white-space: pre;
-  overflow: hidden;
+/* Canvas-based braille blocks. CSS just reserves layout space; the
+   bitmap dimensions and CSS pixel size are set by app.js per-paint
+   based on the parent's content width and a fixed row count. */
+canvas.g, canvas.memhist-graph, canvas.diskio-graph, canvas.logo {
+  display: block;
 }
+
 .cpu-graph {
-  color: var(--cpu-mid);
-  font-size: 14px;
-  line-height: 1;
-  /* 14 braille rows × 14px = 196px — plenty of headroom so we can show
-     small CPU values clearly without saturating big ones. */
+  /* 14 braille rows × 14px = 196px — keep this floor so the panel
+     reserves space before JS sets the canvas's pixel height. */
   min-height: 196px;
 }
 
@@ -308,9 +312,8 @@ body { padding: 10px 6px 5px; }
 }
 .memhist-block .iface-label .name { color: var(--accent); font-weight: 700; }
 .memhist-graph {
-  flex: 1 1 auto;
-  font-size: 14px;
-  line-height: 1;
+  /* canvas — JS picks the exact pixel height per paint. min-height
+     keeps the block reserved at the right size before first paint. */
   min-height: 56px;
 }
 .mem-row {
@@ -394,12 +397,10 @@ body { padding: 10px 6px 5px; }
 }
 .diskio-block .iface-label .name { color: var(--accent); font-weight: 700; }
 .diskio-graph {
-  font-size: 14px;
-  line-height: 1;
-  min-height: 60px;
+  /* canvas — 6 rows × 14px = 84px is the rendered height; min-height
+     reserves layout space before JS sets the bitmap. */
+  min-height: 84px;
 }
-.diskio-graph .read-half  { color: var(--cached-mid); }
-.diskio-graph .write-half { color: var(--available-mid); }
 .disk-row {
   display: flex;
   flex-direction: column;
@@ -458,14 +459,12 @@ body { padding: 10px 6px 5px; }
 .net-graph-block .iface-label .name { color: var(--accent); font-weight: 700; }
 .net-graph-block .iface-label .ip-sep { color: var(--txt-dimmer); padding: 0 2px; }
 .net-graph {
-  flex: 1 1 auto;
-  font-size: 14px;
-  line-height: 1;
+  /* canvas — eth0 = 8 rows × 14px = 112px, wg0 = 6 rows × 14px = 84px.
+     JS sets the actual canvas dimensions per paint. */
+  display: block;
 }
-.net-graph.eth0 .net-down-half { color: var(--eth-down); }
-.net-graph.eth0 .net-up-half   { color: var(--eth-up);   }
-.net-graph.wg0  .net-down-half { color: var(--wg-down);  }
-.net-graph.wg0  .net-up-half   { color: var(--wg-up);    }
+.net-graph.eth0 { min-height: 112px; }
+.net-graph.wg0  { min-height: 84px; }
 
 .net-info {
   grid-column: 2;
@@ -641,14 +640,10 @@ body { padding: 10px 6px 5px; }
   color: var(--hi);
   white-space: nowrap;
 }
-/* 物見 (monomi) logo — kanji rasterised to braille via canvas in JS.
-   Bottom-right aligned, dim grey watermark. */
+/* 物見 (monomi) logo — kanji rasterised to braille, then painted to
+   this <canvas> by app.js. Bottom-right aligned, dim grey watermark. */
 .logo {
   margin: 0 0 0 auto;
-  font-size: 9px;
-  line-height: 1;
-  white-space: pre;
-  color: rgba(212, 212, 212, 0.35);
   user-select: none;
   pointer-events: none;
 }

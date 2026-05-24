@@ -91,6 +91,100 @@ function setHTML(el, html) {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// canvas painter for braille graphs
+//
+// Windows DirectWrite applies per-glyph sub-pixel positioning when
+// rendering braille characters (U+2800–U+28FF) in HTML, so columns
+// drift across rows. The visible result: "floating dots" above
+// mirrored CPU / network waves and a slight skew in the multi-row
+// kanji logo. Mac CoreText doesn't do this.
+//
+// Drawing via <canvas> + ctx.fillText one character at a time at
+// rounded integer pixel positions removes the problem entirely:
+// every dot lines up across rows on every platform.
+// ─────────────────────────────────────────────────────────────────────────────
+const BRAILLE_FONT_STACK =
+  'Consolas, "Cascadia Mono", "DejaVu Sans Mono", Menlo, "Liberation Mono", monospace';
+function brailleFont(px) { return px + "px " + BRAILLE_FONT_STACK; }
+
+// shared offscreen 2d context for character-width measurement
+let _measureCtx = null;
+function measureCharW(fontSize) {
+  if (!_measureCtx) _measureCtx = document.createElement("canvas").getContext("2d");
+  _measureCtx.font = brailleFont(fontSize);
+  // measure the densest braille glyph so we get the widest case
+  return _measureCtx.measureText("⣿").width;
+}
+
+// How many braille columns fit at `fontSize` inside `canvas`'s parent.
+function colsFor(canvas, fontSize) {
+  if (!canvas) return 60;
+  const parent = canvas.parentElement;
+  const px = (parent && parent.clientWidth) || canvas.clientWidth || 200;
+  const charW = measureCharW(fontSize);
+  return Math.max(8, Math.floor(px / charW));
+}
+
+// How many braille rows fit vertically inside `canvas`'s parent.
+// `reserveTopPx` accounts for sibling content above (e.g. labels).
+function rowsForCanvas(canvas, lineHeight, reserveTopPx) {
+  if (!canvas) return 4;
+  const lh = lineHeight || 14;
+  const parent = canvas.parentElement;
+  const pH = (parent && parent.clientHeight) || 60;
+  const avail = Math.max(lh * 2, pH - (reserveTopPx || 0));
+  return Math.max(2, Math.floor(avail / lh));
+}
+
+// Paint a multi-row braille block into a <canvas>.
+//   lines      : array of strings (one per row)
+//   opts.fontSize   : px size for the braille glyphs
+//   opts.lineHeight : px height per row (defaults to fontSize)
+//   opts.rowColor   : (rowIndex, totalRows) -> css color
+function paintBrailleCanvas(canvas, lines, opts) {
+  if (!canvas || !lines || !lines.length) return;
+  const fontSize   = opts.fontSize   || 14;
+  const lineHeight = opts.lineHeight || fontSize;
+  const rowColor   = opts.rowColor   || (() => "#cccccc");
+  const cols  = lines[0].length;
+  const rows  = lines.length;
+  const charW = measureCharW(fontSize);
+  const cssW  = Math.ceil(cols * charW);
+  const cssH  = rows * lineHeight;
+  const dpr   = window.devicePixelRatio || 1;
+  const bmpW  = Math.round(cssW * dpr);
+  const bmpH  = Math.round(cssH * dpr);
+  if (canvas.width  !== bmpW) canvas.width  = bmpW;
+  if (canvas.height !== bmpH) canvas.height = bmpH;
+  if (canvas.style.width  !== cssW + "px") canvas.style.width  = cssW + "px";
+  if (canvas.style.height !== cssH + "px") canvas.style.height = cssH + "px";
+  const ctx = canvas.getContext("2d");
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+  ctx.clearRect(0, 0, cssW, cssH);
+  ctx.font = brailleFont(fontSize);
+  ctx.textBaseline = "top";
+  ctx.textAlign = "left";
+  for (let r = 0; r < rows; r++) {
+    ctx.fillStyle = rowColor(r, rows);
+    const line = lines[r];
+    const y = r * lineHeight;
+    // draw one char at a time at rounded integer X so the same
+    // columns sit at the same X on every row — no DirectWrite drift.
+    for (let c = 0; c < cols; c++) {
+      ctx.fillText(line[c], Math.round(c * charW), y);
+    }
+  }
+}
+
+// canvas-rendered graph colours (per-interface mirror halves, disk i/o, logo)
+const NET_COLORS = {
+  eth0: { down: "#4f43a3", up: "#dcafde" },
+  wg0:  { down: "#74e6fc", up: "#ff40b6" },
+};
+const DISKIO_COLORS = { read: "#74e6fc", write: "#ffd77a" };
+const LOGO_COLOR    = "rgba(212, 212, 212, 0.35)";
+
+// ─────────────────────────────────────────────────────────────────────────────
 // braille chart — N rows × W chars, each char = 2×4 dots
 // ─────────────────────────────────────────────────────────────────────────────
 const BRAILLE_BASE = 0x2800;
@@ -239,44 +333,40 @@ function cpuRampColor(t) {
 }
 
 // Non-mirror gradient graph: bottom = low (green), top = high (red).
-// Used for the mem history sparkline. Each braille row is wrapped in
-// a span whose colour matches its vertical position.
+// Used for the mem history sparkline. Each row drawn on canvas with
+// per-row gradient colour.
 function paintGradientGraph(el, values, opts) {
   if (!el) return;
   const text = brailleChart(values, opts);
   const lines = text.split("\n");
-  const h = lines.length;
-  let html = "";
-  for (let i = 0; i < h; i++) {
+  paintBrailleCanvas(el, lines, {
+    fontSize: 14,
+    lineHeight: 14,
     // i=0 is top of chart = high values (red), i=h-1 is bottom (green)
-    const t = h > 1 ? 1 - (i / (h - 1)) : 0;
-    html += "<span style='color:" + cpuRampColor(t) + "'>" +
-      escapeHTML(lines[i]) + "</span>" +
-      (i < h - 1 ? "\n" : "");
-  }
-  setHTML(el, html);
+    rowColor: (i, h) => cpuRampColor(h > 1 ? 1 - (i / (h - 1)) : 0),
+  });
 }
 
-// Render a mirror-mode braille chart, then wrap each visual row in a
-// span coloured along the green→red ramp. Rows nearest the midline
-// represent low values (lots of headroom, green) and rows nearest the
-// outer edges represent heavy load (red).
+// Render a mirror-mode braille chart, then colour each visual row along
+// the green→red ramp. Rows nearest the midline represent low values
+// (lots of headroom, green) and rows nearest the outer edges represent
+// heavy load (red).
 function paintGradientCpuGraph(el, values, opts) {
   if (!el) return;
   const text = brailleChart(values, opts);
   const lines = text.split("\n");
   const h = lines.length;
   const halfH = h / 2;
-  let html = "";
-  for (let i = 0; i < h; i++) {
-    // distance from midline as a 0..1 normalised value
-    const dist = i < halfH ? halfH - 1 - i : i - halfH;
-    const t = halfH > 1 ? dist / (halfH - 1) : 0;
-    html += "<span style='color:" + cpuRampColor(t) + "'>" +
-      escapeHTML(lines[i]) + "</span>" +
-      (i < h - 1 ? "\n" : "");
-  }
-  setHTML(el, html);
+  paintBrailleCanvas(el, lines, {
+    fontSize: 14,
+    lineHeight: 14,
+    rowColor: (i) => {
+      // distance from midline as a 0..1 normalised value
+      const dist = i < halfH ? halfH - 1 - i : i - halfH;
+      const t = halfH > 1 ? dist / (halfH - 1) : 0;
+      return cpuRampColor(t);
+    },
+  });
 }
 
 // width of the panel-area in monospace characters at our font size
@@ -521,11 +611,11 @@ function updateNetTotals(rxBps, txBps, ts) {
   lastBytesTs = ts;
 }
 
-// helper for the split / dual-coloured net graph
+// helper for the split / dual-coloured net graph (canvas-rendered)
 function paintNetGraph(elId, downHist, upHist, height, ifaceClass) {
   const ng = $(elId);
   if (!ng) return;
-  const w = charsFor(ng, 9);
+  const w = colsFor(ng, 14);
   const downMax = downHist.filter(Number.isFinite);
   const upMax   = upHist.filter(Number.isFinite);
   const sharedMax = Math.max(
@@ -533,17 +623,18 @@ function paintNetGraph(elId, downHist, upHist, height, ifaceClass) {
     downMax.length ? Math.max(...downMax) : 0,
     upMax.length   ? Math.max(...upMax)   : 0,
   );
-  const h = height; // must be even — 4 rows for down + 4 for up
+  const h = height; // must be even — top half = down, bottom half = up
   const full = brailleChart(downHist, {
     width: w, height: h, max: sharedMax, mirror: true, values2: upHist,
   });
   const lines = full.split("\n");
   const halfIdx = h / 2;
-  const upper = lines.slice(0, halfIdx).join("\n");
-  const lower = lines.slice(halfIdx).join("\n");
-  setHTML(ng,
-    "<span class='net-down-half'>" + escapeHTML(upper) + "</span>\n" +
-    "<span class='net-up-half'>"   + escapeHTML(lower) + "</span>");
+  const colors = NET_COLORS[ifaceClass] || NET_COLORS.eth0;
+  paintBrailleCanvas(ng, lines, {
+    fontSize: 14,
+    lineHeight: 14,
+    rowColor: (i) => i < halfIdx ? colors.down : colors.up,
+  });
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -582,7 +673,7 @@ function paint(body) {
   // dots near the outer edges (heavy load) trend red.
   const cpuEl = $("cpu-graph");
   if (cpuEl) {
-    const w = charsFor(cpuEl, 9);
+    const w = colsFor(cpuEl, 14);
     paintGradientCpuGraph(cpuEl, hist.cpu_percent || [], {
       width: w, height: 14, max: 100, mirror: true, curve: 0.5,
     });
@@ -605,8 +696,9 @@ function paint(body) {
   // dynamically so it flex-grows to make the mem panel match disks.
   const memGraphEl = $("mem-graph");
   if (memGraphEl) {
-    const w = charsFor(memGraphEl, 9);
-    const h = rowsFor(memGraphEl, 14);
+    const w = colsFor(memGraphEl, 14);
+    // memhist-block is 73px tall; reserve ~17px for the label row.
+    const h = rowsForCanvas(memGraphEl, 14, 17);
     paintGradientGraph(memGraphEl, hist.memory_percent || [], {
       width: w, height: h, max: 100,
     });
@@ -670,7 +762,7 @@ function paint(body) {
   //    the disks panel under the disk list. ──
   const ioEl = $("diskio-graph");
   if (ioEl) {
-    const w = charsFor(ioEl, 9);
+    const w = colsFor(ioEl, 14);
     const reads  = hist.disk_read  || [];
     const writes = hist.disk_write || [];
     const sharedMax = Math.max(
@@ -684,9 +776,11 @@ function paint(body) {
     });
     const lines = full.split("\n");
     const half = h / 2;
-    setHTML(ioEl,
-      "<span class='read-half'>"  + escapeHTML(lines.slice(0, half).join("\n")) + "</span>\n" +
-      "<span class='write-half'>" + escapeHTML(lines.slice(half).join("\n"))    + "</span>");
+    paintBrailleCanvas(ioEl, lines, {
+      fontSize: 14,
+      lineHeight: 14,
+      rowColor: (i) => i < half ? DISKIO_COLORS.read : DISKIO_COLORS.write,
+    });
   }
   const dioNow = snap.disk_io || {};
   const ioR = Number.isFinite(dioNow.read_Bps)  ? dioNow.read_Bps  : null;
@@ -776,8 +870,16 @@ async function poll() {
 (function init() {
   poll();   // kicks the self-rescheduling loop
   // one-shot: rasterise the monomi kanji into the logo slot.
+  // Drawn on canvas so DirectWrite per-glyph positioning can't slant it.
   const logoEl = document.getElementById("logo");
-  if (logoEl) logoEl.textContent = kanjiToBraille("物見", 32);
+  if (logoEl) {
+    const lines = kanjiToBraille("物見", 32).split("\n");
+    paintBrailleCanvas(logoEl, lines, {
+      fontSize: 9,
+      lineHeight: 9,
+      rowColor: () => LOGO_COLOR,
+    });
+  }
   let rzt = null;
   window.addEventListener("resize", () => {
     if (rzt) clearTimeout(rzt);

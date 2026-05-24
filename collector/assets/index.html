@@ -24,7 +24,7 @@
       </header>
       <div class="cpu-body">
         <div class="cpu-graphs">
-          <pre class="g cpu-graph" id="cpu-graph"></pre>
+          <canvas class="g cpu-graph" id="cpu-graph"></canvas>
         </div>
         <div class="cpu-stats">
           <table class="cpu-table">
@@ -56,7 +56,7 @@
       </div>
       <div class="memhist-block">
         <div class="iface-label"><span class="name">history</span> &nbsp;<span id="mem-pct-now">--%</span></div>
-        <pre class="g memhist-graph" id="mem-graph"></pre>
+        <canvas class="g memhist-graph" id="mem-graph"></canvas>
       </div>
     </section>
 
@@ -71,7 +71,7 @@
       </div>
       <div class="diskio-block">
         <div class="iface-label"><span class="name">i/o</span> &nbsp;<span id="diskio-now">--</span></div>
-        <pre class="g diskio-graph" id="diskio-graph"></pre>
+        <canvas class="g diskio-graph" id="diskio-graph"></canvas>
       </div>
       <div class="swap-body" id="swap-body">
         <!-- populated by JS when swap is configured -->
@@ -87,11 +87,11 @@
       <div class="net-body">
         <div class="net-graph-block">
           <div class="iface-label"><span class="name">eth0</span> &nbsp;<span id="eth-ip">--</span></div>
-          <pre class="g net-graph eth0" id="net-graph-eth0"></pre>
+          <canvas class="g net-graph eth0" id="net-graph-eth0"></canvas>
         </div>
         <div class="net-graph-block">
           <div class="iface-label"><span class="name">wg0</span> &nbsp;<span id="wg-ip">--</span></div>
-          <pre class="g net-graph wg0" id="net-graph-wg0"></pre>
+          <canvas class="g net-graph wg0" id="net-graph-wg0"></canvas>
         </div>
         <div class="net-info">
           <div class="net-block">
@@ -146,7 +146,7 @@
           <div class="sysinfo" id="sysinfo">
             <!-- populated by JS -->
           </div>
-          <pre class="logo" id="logo" aria-label="monomi"></pre>
+          <canvas class="logo" id="logo" aria-label="monomi"></canvas>
         </div>
       </div>
     </section>
