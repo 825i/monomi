@@ -9,10 +9,12 @@ const $ = (id) => document.getElementById(id);
 document.getElementById("rate-ms") && (document.getElementById("rate-ms").textContent = POLL_MS + "ms");
 
 let lastSeenTs = 0;
-// totals so we can compute Top + Total for the net panel locally
-let netTopDown = 0, netTopUp = 0;
-let netTotalDown = 0, netTotalUp = 0;
-let lastBytesTs = 0;
+// per-interface running peak (Top) + time-integrated bytes (Total),
+// computed locally so each interface tracks its own session stats.
+const netAccum = {
+  eth0: { topDown: 0, topUp: 0, totalDown: 0, totalUp: 0, lastTs: 0 },
+  wg0:  { topDown: 0, topUp: 0, totalDown: 0, totalUp: 0, lastTs: 0 },
+};
 
 // ─────────────────────────────────────────────────────────────────────────────
 // formatters
@@ -600,15 +602,17 @@ function renderSysinfo(snap) {
 // ─────────────────────────────────────────────────────────────────────────────
 // net top / totals
 // ─────────────────────────────────────────────────────────────────────────────
-function updateNetTotals(rxBps, txBps, ts) {
-  if (rxBps != null && rxBps > netTopDown) netTopDown = rxBps;
-  if (txBps != null && txBps > netTopUp)   netTopUp   = txBps;
-  if (lastBytesTs && ts > lastBytesTs) {
-    const dt = ts - lastBytesTs;
-    if (rxBps != null) netTotalDown += rxBps * dt;
-    if (txBps != null) netTotalUp   += txBps * dt;
+function updateNetTotals(key, rxBps, txBps, ts) {
+  const a = netAccum[key];
+  if (!a) return;
+  if (rxBps != null && rxBps > a.topDown) a.topDown = rxBps;
+  if (txBps != null && txBps > a.topUp)   a.topUp   = txBps;
+  if (a.lastTs && ts > a.lastTs) {
+    const dt = ts - a.lastTs;
+    if (rxBps != null) a.totalDown += rxBps * dt;
+    if (txBps != null) a.totalUp   += txBps * dt;
   }
-  lastBytesTs = ts;
+  a.lastTs = ts;
 }
 
 // helper for the split / dual-coloured net graph (canvas-rendered)
@@ -732,14 +736,14 @@ function paint(body) {
   const ethUpNow   = ifaceNow.up_Bps   != null ? ifaceNow.up_Bps   : pm.network_upload_speed;
   setText($("net-down-now"), fmtRate(ethDownNow) + " (" + fmtRateBs(ethDownNow) + ")");
   setText($("net-up-now"),   fmtRate(ethUpNow)   + " (" + fmtRateBs(ethUpNow)   + ")");
-  updateNetTotals(ethDownNow, ethUpNow, snap.ts);
-  setText($("net-down-top"),   fmtRate(netTopDown));
-  setText($("net-up-top"),     fmtRate(netTopUp));
-  setText($("net-down-total"), fmtBytes(netTotalDown));
-  setText($("net-up-total"),   fmtBytes(netTotalUp));
+  updateNetTotals("eth0", ethDownNow, ethUpNow, snap.ts);
+  setText($("net-down-top"),   fmtRate(netAccum.eth0.topDown));
+  setText($("net-up-top"),     fmtRate(netAccum.eth0.topUp));
+  setText($("net-down-total"), fmtBytes(netAccum.eth0.totalDown));
+  setText($("net-up-total"),   fmtBytes(netAccum.eth0.totalUp));
 
-  // wireguard 'now' values (top/total skipped — fewer numbers, cleaner).
-  // Same "rate (bytes/s)" format as eth0; "(idle)" when no traffic.
+  // wireguard 'now' values — same "rate (bytes/s)" format as eth0,
+  // "(idle)" when no traffic, plus matching Top + Total below.
   const wgNow = (snap.iface && snap.iface.wg0) || {};
   setText($("wg-down-now"),
     wgNow.down_Bps != null
@@ -749,6 +753,11 @@ function paint(body) {
     wgNow.up_Bps != null
       ? fmtRate(wgNow.up_Bps) + " (" + fmtRateBs(wgNow.up_Bps) + ")"
       : "(idle)");
+  updateNetTotals("wg0", wgNow.down_Bps, wgNow.up_Bps, snap.ts);
+  setText($("wg-down-top"),   fmtRate(netAccum.wg0.topDown));
+  setText($("wg-up-top"),     fmtRate(netAccum.wg0.topUp));
+  setText($("wg-down-total"), fmtBytes(netAccum.wg0.totalDown));
+  setText($("wg-up-total"),   fmtBytes(netAccum.wg0.totalUp));
   // wg0 label: PIA's tunnel exit IP — wrapped in .public-ip so it
   // inherits the blur-until-hover treatment.
   if (snap.wg_public_ip) {
