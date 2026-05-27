@@ -493,8 +493,14 @@ canvas.g, canvas.memhist-graph, canvas.diskio-graph, canvas.logo {
 .net-row.wg .ar.dn { color: var(--wg-down); }
 .net-row.wg .ar.up { color: var(--wg-up); }
 .net-row .lbl   { color: var(--txt-dim); }
-.net-row .now   { color: var(--hi); text-align: right; }
+.net-row .now   { color: var(--hi); text-align: left; white-space: nowrap; }
 .net-row .num2  { color: var(--hi); text-align: right; }
+
+/* Live-speed rows are just "arrow + value". Drop the wide right-aligned
+   column so the value sits directly after the arrow and the trailing
+   "(x KiB/s)" stays on the same line instead of wrapping. The Top:/Total:
+   rows keep the 3-column grid above. */
+.net-row:has(.now) { grid-template-columns: auto 1fr; gap: 3px; }
 
 @media (max-width: 980px) {
   .net-body  { grid-template-columns: minmax(0, 1fr); grid-template-rows: auto auto auto; }
