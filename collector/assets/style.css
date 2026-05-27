@@ -453,17 +453,18 @@ canvas.g, canvas.memhist-graph, canvas.diskio-graph, canvas.logo {
 }
 .net-graph-block .iface-label {
   color: var(--txt-dim);
-  font-size: 11px;
+  /* 10px (vs the 11px elsewhere) so the full "<iface> <lan-ip> |
+     <public-ip>" string fits the narrow graph column on one line. */
+  font-size: 10px;
   margin-bottom: 2px;
-  /* keep "<iface> <lan-ip> | <public-ip>" on a single line; if the
-     column is too narrow the (blurred) public IP truncates rather than
-     wrapping to a second row. */
+  /* keep it on a single line; if the column is ever too narrow the
+     (blurred) public IP truncates rather than wrapping to a second row. */
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 .net-graph-block .iface-label .name { color: var(--accent); font-weight: 700; }
-.net-graph-block .iface-label .ip-sep { color: var(--txt-dimmer); padding: 0 2px; }
+.net-graph-block .iface-label .ip-sep { color: var(--txt-dimmer); padding: 0 4px; }
 .net-graph {
   /* canvas — both eth0 and wg0 are 8 rows × 14px = 112px. JS sets the
      actual canvas dimensions per paint. */

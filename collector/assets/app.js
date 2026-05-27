@@ -740,7 +740,7 @@ function paint(body) {
   const ethLan = pm.ip_eth0 || "-";
   if (snap.public_ip) {
     setHTML($("eth-ip"),
-      escapeHTML(ethLan) + " <span class='ip-sep'>|</span> " +
+      escapeHTML(ethLan) + "<span class='ip-sep'>|</span>" +
       "<span class='public-ip' title='public IP'>" +
       escapeHTML(snap.public_ip) + "</span>");
   } else {
