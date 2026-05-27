@@ -41,6 +41,13 @@ function fmtRateBs(v) {
   if (v == null || !Number.isFinite(v)) return "-";
   return fmtBytes(v) + "/s";
 }
+// Live speed as "<rate> (<bytes/s>)". The rate sits in a fixed-width
+// cell (see .net-row .now .rate in CSS) so the bracket starts at the
+// same column on every row no matter how many digits the rate has.
+function nowSpeedHTML(bps) {
+  return "<span class='rate'>" + escapeHTML(fmtRate(bps)) + "</span>" +
+         "<span class='bps'>(" + escapeHTML(fmtRateBs(bps)) + ")</span>";
+}
 function fmtPct(v) {
   if (v == null || !Number.isFinite(v)) return "-";
   return v.toFixed(0) + "%";
@@ -734,8 +741,8 @@ function paint(body) {
   const ifaceNow = (snap.iface && snap.iface.eth0) || {};
   const ethDownNow = ifaceNow.down_Bps != null ? ifaceNow.down_Bps : pm.network_download_speed;
   const ethUpNow   = ifaceNow.up_Bps   != null ? ifaceNow.up_Bps   : pm.network_upload_speed;
-  setText($("net-down-now"), fmtRate(ethDownNow) + " (" + fmtRateBs(ethDownNow) + ")");
-  setText($("net-up-now"),   fmtRate(ethUpNow)   + " (" + fmtRateBs(ethUpNow)   + ")");
+  setHTML($("net-down-now"), nowSpeedHTML(ethDownNow));
+  setHTML($("net-up-now"),   nowSpeedHTML(ethUpNow));
   updateNetTotals("eth0", ethDownNow, ethUpNow, snap.ts);
   setText($("net-down-top"),   fmtRate(netAccum.eth0.topDown));
   setText($("net-up-top"),     fmtRate(netAccum.eth0.topUp));
@@ -745,14 +752,8 @@ function paint(body) {
   // wireguard 'now' values — same "rate (bytes/s)" format as eth0,
   // "(idle)" when no traffic, plus matching Top + Total below.
   const wgNow = (snap.iface && snap.iface.wg0) || {};
-  setText($("wg-down-now"),
-    wgNow.down_Bps != null
-      ? fmtRate(wgNow.down_Bps) + " (" + fmtRateBs(wgNow.down_Bps) + ")"
-      : "(idle)");
-  setText($("wg-up-now"),
-    wgNow.up_Bps != null
-      ? fmtRate(wgNow.up_Bps) + " (" + fmtRateBs(wgNow.up_Bps) + ")"
-      : "(idle)");
+  setHTML($("wg-down-now"), wgNow.down_Bps != null ? nowSpeedHTML(wgNow.down_Bps) : "(idle)");
+  setHTML($("wg-up-now"),   wgNow.up_Bps   != null ? nowSpeedHTML(wgNow.up_Bps)   : "(idle)");
   updateNetTotals("wg0", wgNow.down_Bps, wgNow.up_Bps, snap.ts);
   setText($("wg-down-top"),   fmtRate(netAccum.wg0.topDown));
   setText($("wg-up-top"),     fmtRate(netAccum.wg0.topUp));

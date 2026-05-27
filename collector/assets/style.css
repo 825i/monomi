@@ -495,6 +495,10 @@ canvas.g, canvas.memhist-graph, canvas.diskio-graph, canvas.logo {
 .net-row .lbl   { color: var(--txt-dim); }
 .net-row .now   { color: var(--hi); text-align: left; white-space: nowrap; }
 .net-row .num2  { color: var(--hi); text-align: right; }
+/* fixed-width rate cell so the "(x/s)" bracket starts at the same column
+   on every row regardless of digit count. 10ch holds the widest value
+   ("99.9 Kibps" / "1024 Mibps"); margin-right keeps a gap to the bracket. */
+.net-row .now .rate { display: inline-block; width: 10ch; margin-right: 0.6em; }
 
 /* Live-speed rows are just "arrow + value". Drop the wide right-aligned
    column so the value sits directly after the arrow and the trailing
