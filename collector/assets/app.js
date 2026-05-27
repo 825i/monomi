@@ -126,12 +126,14 @@ function measureCharW(fontSize) {
 }
 
 // How many braille columns fit at `fontSize` inside `canvas`'s parent.
+// Round UP so the columns cover the full width — the final column is
+// clipped at the canvas edge rather than leaving a dead gap on the right.
 function colsFor(canvas, fontSize) {
   if (!canvas) return 60;
   const parent = canvas.parentElement;
   const px = (parent && parent.clientWidth) || canvas.clientWidth || 200;
   const charW = measureCharW(fontSize);
-  return Math.max(8, Math.floor(px / charW));
+  return Math.max(8, Math.ceil(px / charW));
 }
 
 // How many braille rows fit vertically inside `canvas`'s parent.
@@ -150,6 +152,8 @@ function rowsForCanvas(canvas, lineHeight, reserveTopPx) {
 //   opts.fontSize   : px size for the braille glyphs
 //   opts.lineHeight : px height per row (defaults to fontSize)
 //   opts.rowColor   : (rowIndex, totalRows) -> css color
+//   opts.natural    : size the canvas to its content (logo). Default is
+//                     to fill the parent's width so graphs reach the edge.
 function paintBrailleCanvas(canvas, lines, opts) {
   if (!canvas || !lines || !lines.length) return;
   const fontSize   = opts.fontSize   || 14;
@@ -158,7 +162,15 @@ function paintBrailleCanvas(canvas, lines, opts) {
   const cols  = lines[0].length;
   const rows  = lines.length;
   const charW = measureCharW(fontSize);
-  const cssW  = Math.ceil(cols * charW);
+  // Graphs fill the parent's content width (colsFor picked enough columns
+  // to cover it, last one clipped at the edge). The logo sizes to itself.
+  let cssW;
+  if (opts.natural) {
+    cssW = Math.ceil(cols * charW);
+  } else {
+    const parent = canvas.parentElement;
+    cssW = (parent && parent.clientWidth) || Math.ceil(cols * charW);
+  }
   const cssH  = rows * lineHeight;
   const dpr   = window.devicePixelRatio || 1;
   const bmpW  = Math.round(cssW * dpr);
@@ -773,7 +785,7 @@ function paint(body) {
   const eth0Down = hist.eth0_down && hist.eth0_down.length ? hist.eth0_down : hist.network_download_speed || [];
   const eth0Up   = hist.eth0_up   && hist.eth0_up.length   ? hist.eth0_up   : hist.network_upload_speed   || [];
   paintNetGraph("net-graph-eth0", eth0Down, eth0Up, 8, "eth0");
-  paintNetGraph("net-graph-wg0",  hist.wg0_down || [], hist.wg0_up || [], 6, "wg0");
+  paintNetGraph("net-graph-wg0",  hist.wg0_down || [], hist.wg0_up || [], 8, "wg0");
 
   // ── disk I/O sparkline (read on top, write below). Renders into
   //    the disks panel under the disk list. ──
@@ -895,6 +907,7 @@ async function poll() {
       fontSize: 9,
       lineHeight: 9,
       rowColor: () => LOGO_COLOR,
+      natural: true,
     });
   }
   let rzt = null;
