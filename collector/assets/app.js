@@ -738,10 +738,17 @@ function paint(body) {
   setText($("net-down-total"), fmtBytes(netTotalDown));
   setText($("net-up-total"),   fmtBytes(netTotalUp));
 
-  // wireguard 'now' values (top/total skipped — fewer numbers, cleaner)
+  // wireguard 'now' values (top/total skipped — fewer numbers, cleaner).
+  // Same "rate (bytes/s)" format as eth0; "(idle)" when no traffic.
   const wgNow = (snap.iface && snap.iface.wg0) || {};
-  setText($("wg-down-now"), wgNow.down_Bps != null ? fmtRate(wgNow.down_Bps) : "(idle)");
-  setText($("wg-up-now"),   wgNow.up_Bps   != null ? fmtRate(wgNow.up_Bps)   : "(idle)");
+  setText($("wg-down-now"),
+    wgNow.down_Bps != null
+      ? fmtRate(wgNow.down_Bps) + " (" + fmtRateBs(wgNow.down_Bps) + ")"
+      : "(idle)");
+  setText($("wg-up-now"),
+    wgNow.up_Bps != null
+      ? fmtRate(wgNow.up_Bps) + " (" + fmtRateBs(wgNow.up_Bps) + ")"
+      : "(idle)");
   // wg0 label: PIA's tunnel exit IP — wrapped in .public-ip so it
   // inherits the blur-until-hover treatment.
   if (snap.wg_public_ip) {
